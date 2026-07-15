@@ -1,0 +1,6 @@
+{
+  "name": "CHẠM - Sức mạnh Truyền thông Thị giác",
+  "description": "Chiến dịch truyền thông thị giác và Dự án nghiên cứu khoa học về tác động của hình ảnh đến hành vi trắc ẩn của học sinh THPT Nguyễn Du.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
