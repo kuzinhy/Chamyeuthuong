@@ -28,6 +28,8 @@ import { InteractiveComicPage } from './pages/InteractiveComicPage';
 import { SurveyPage } from './pages/SurveyPage';
 import { ExhibitionPage } from './pages/ExhibitionPage';
 import { AdminPage } from './pages/AdminPage';
+import { LoginPage } from './pages/LoginPage';
+import { Forbidden403Page } from './pages/Forbidden403Page';
 
 // Types & Services
 import { 
@@ -41,6 +43,7 @@ import {
   LetterCategory 
 } from './types';
 import { storageService } from './services/storage';
+import { apiService } from './services/api';
 
 function AppContent() {
   const [activePage, setActivePage] = useState<ActiveNavPage>('home');
@@ -63,7 +66,7 @@ function AppContent() {
   // Toast
   const { showToast } = useToast();
 
-  // Load all initial data from storageService
+  // Load all initial data from storageService and sync with real server database
   useEffect(() => {
     setStories(storageService.getStories());
     setSubmissions(storageService.getSubmissions());
@@ -71,6 +74,19 @@ function AppContent() {
     setGalleryItems(storageService.getGalleryItems());
     setPhotovoiceItems(storageService.getPhotovoiceItems());
     setSurveys(storageService.getSurveyResponses());
+
+    // Background sync from real server database
+    apiService.getStories().then((serverStories) => {
+      if (serverStories && serverStories.length > 0) {
+        setStories(serverStories);
+      }
+    }).catch(() => {});
+
+    apiService.getLetters().then((serverLetters) => {
+      if (serverLetters && serverLetters.length > 0) {
+        setLetters(serverLetters);
+      }
+    }).catch(() => {});
   }, []);
 
   // Web Audio Gentle Ambient Sound Generator for meditation & reading
@@ -379,6 +395,12 @@ function AppContent() {
           />
         )}
 
+        {activePage === 'dang-nhap' && (
+          <LoginPage
+            onNavigate={handleNavigate}
+          />
+        )}
+
         {activePage === 'admin' && (
           <AdminPage
             letters={letters}
@@ -396,6 +418,7 @@ function AppContent() {
             onDeleteStory={handleDeleteStory}
             onConvertSubmission={handleConvertSubmission}
             onRejectSubmission={handleRejectSubmission}
+            onNavigate={handleNavigate}
           />
         )}
       </main>

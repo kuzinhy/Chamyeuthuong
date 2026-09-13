@@ -30,16 +30,12 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Col 1 & 2: Brand & Slogan */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 via-rose-400 to-amber-300 p-0.5 shadow-md flex items-center justify-center">
-                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-rose-500">
-                  <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
-                </div>
-              </div>
+              <img src="/favicon.svg" alt="LUMI Mascot" className="w-11 h-11 object-contain drop-shadow-md" />
               <div>
                 <span className="font-display font-extrabold text-xl text-white tracking-tight">
                   LUMI – CHẠM IU THƯƠNG
                 </span>
-                <p className="text-xs text-rose-400 font-medium">Lan tỏa lòng trắc ẩn</p>
+                <p className="text-xs text-amber-400 font-medium">Lan tỏa lòng trắc ẩn</p>
               </div>
             </div>
 

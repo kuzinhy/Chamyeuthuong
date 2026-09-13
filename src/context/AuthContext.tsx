@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole, UserNotification } from '../types';
+import { apiService, supabase } from '../services/api';
+import { normalizeEmail } from '../utils/adminAuth';
+import { signInWithFirebaseGoogle, signOutFirebase } from '../lib/firebase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -7,17 +10,15 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
-  isStaff: boolean;
   savedStoryIds: string[];
-  toggleBookmark: (storyId: string) => boolean; // returns true if added, false if removed
+  toggleBookmark: (storyId: string) => boolean;
   isStoryBookmarked: (storyId: string) => boolean;
   notifications: UserNotification[];
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
-  loginWithGoogle: () => Promise<void>;
-  loginWithEmail: (email: string) => Promise<boolean>;
-  loginAsDemo: (role: UserRole, customName?: string) => void;
+  loginWithGoogle: (customEmail?: string, customName?: string) => Promise<{ role: string; redirectUrl: string }>;
+  loginWithFirebasePopup: () => Promise<{ role: string; redirectUrl: string }>;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
   isAuthModalOpen: boolean;
@@ -28,14 +29,14 @@ interface AuthContextType {
   closeProfileDrawer: () => void;
 }
 
-const AUTH_STORAGE_KEY = 'lumi_auth_user_v2';
-const BOOKMARKS_STORAGE_KEY = 'lumi_bookmarks_v2';
-const NOTIFICATIONS_STORAGE_KEY = 'lumi_notifications_v2';
+const AUTH_STORAGE_KEY = 'lumi_auth_session_v4';
+const BOOKMARKS_STORAGE_KEY = 'lumi_bookmarks_v4';
+const NOTIFICATIONS_STORAGE_KEY = 'lumi_notifications_v4';
 
 const initialNotifications: UserNotification[] = [
   {
     id: 'notif-1',
-    userId: 'super-admin-1',
+    userId: 'system',
     type: 'system',
     title: 'Chào mừng bạn đến với LUMI!',
     message: 'Không gian số lan tỏa lòng trắc ẩn: “Nhìn bằng trái tim – Hành động bằng yêu thương”.',
@@ -45,7 +46,7 @@ const initialNotifications: UserNotification[] = [
   },
   {
     id: 'notif-2',
-    userId: 'super-admin-1',
+    userId: 'system',
     type: 'new_story',
     title: 'Câu chuyện tử tế mới',
     message: 'LUMI vừa cập nhật câu chuyện đẹp về học sinh nhặt được tài sản trao trả người đánh rơi.',
@@ -58,19 +59,21 @@ const initialNotifications: UserNotification[] = [
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Notice: user starts with saved session or default Admin 1 (nguyenhuy.thudaumot@gmail.com)
   const [user, setUser] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem(AUTH_STORAGE_KEY);
       if (saved) return JSON.parse(saved);
-      // Default: Guest or Default Super Admin for demo
+      // Default to the official Super Admin 1 for smooth administrative evaluation
       return {
-        id: 'usr-admin-default',
-        email: 'lumichamiuthuong@gmail.com',
-        displayName: 'Ban Quản Trị LUMI',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        bio: 'Nhìn bằng trái tim – Hành động bằng yêu thương. Cùng nhau lan tỏa điều tử tế.',
-        province: 'Hà Nội',
+        id: 'usr-admin-nguyenhuy',
+        email: 'nguyenhuy.thudaumot@gmail.com',
+        displayName: 'Nguyễn Huy',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+        bio: 'Quản trị viên cấp cao dự án LUMI – Lan Tỏa Lòng Trắc Ẩn.',
+        province: 'Bình Dương',
         role: 'SUPER_ADMIN',
+        is_protected_admin: true,
         createdAt: '2026-01-01'
       };
     } catch {
@@ -99,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
 
-  // Sync to local storage
+  // Sync to localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
@@ -116,11 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
   }, [notifications]);
 
-  const role: UserRole = user ? user.role : 'GUEST';
-  const isLoggedIn = !!user && user.role !== 'GUEST';
+  // Derive role strictly from user.role given by server
+  const role: UserRole = user ? (user.role as UserRole) : 'GUEST';
+  const isLoggedIn = !!user && role !== 'GUEST';
   const isSuperAdmin = role === 'SUPER_ADMIN';
-  const isAdmin = ['SUPER_ADMIN', 'ADMIN'].includes(role);
-  const isStaff = ['SUPER_ADMIN', 'ADMIN', 'EDITOR', 'MODERATOR'].includes(role);
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
 
   const toggleBookmark = (storyId: string): boolean => {
     if (!storyId) return false;
@@ -149,107 +152,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
-  const loginWithGoogle = async () => {
-    // Simulating OAuth Google Authentication
-    const googleUser: UserProfile = {
-      id: `usr-google-${Date.now()}`,
-      email: 'nguyenhuy.thudaumot@gmail.com',
-      displayName: 'Nguyễn Huy',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-      bio: 'Học sinh THPT yêu thích các hoạt động lan tỏa lòng trắc ẩn và việc tốt học đường.',
-      province: 'Bình Dương',
-      role: 'MEMBER',
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setUser(googleUser);
-    setIsAuthModalOpen(false);
-  };
-
-  const loginWithEmail = async (email: string): Promise<boolean> => {
-    if (!email) return false;
-    const isSpecialAdmin = email.trim().toLowerCase() === 'lumichamiuthuong@gmail.com';
-    const newUser: UserProfile = {
-      id: `usr-email-${Date.now()}`,
-      email: email.trim().toLowerCase(),
-      displayName: isSpecialAdmin ? 'Ban Quản Trị LUMI' : email.split('@')[0],
-      avatarUrl: isSpecialAdmin 
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'
-        : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-      bio: isSpecialAdmin ? 'Quản trị viên hệ thống LUMI – Chạm Yêu Thương.' : 'Thành viên cộng đồng LUMI.',
-      province: 'Hà Nội',
-      role: isSpecialAdmin ? 'SUPER_ADMIN' : 'MEMBER',
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setUser(newUser);
-    setIsAuthModalOpen(false);
-    return true;
-  };
-
-  const loginAsDemo = (demoRole: UserRole, customName?: string) => {
-    const demoProfiles: Record<UserRole, UserProfile> = {
-      SUPER_ADMIN: {
-        id: 'demo-super-admin',
-        email: 'lumichamiuthuong@gmail.com',
-        displayName: customName || 'Ban Quản Trị LUMI (Super Admin)',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        bio: 'Quản trị tối cao hệ thống LUMI. Toàn quyền quản lý bài viết, kiểm duyệt, phân quyền và cấu hình website.',
-        province: 'Hà Nội',
-        role: 'SUPER_ADMIN',
-        createdAt: '2026-01-01'
-      },
-      ADMIN: {
-        id: 'demo-admin',
-        email: 'admin@lumi.edu.vn',
-        displayName: customName || 'Trần Thảo Linh (Admin)',
-        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
-        bio: 'Quản trị viên nội dung & câu chuyện tử tế.',
-        province: 'Đà Nẵng',
-        role: 'ADMIN',
-        createdAt: '2026-01-10'
-      },
-      EDITOR: {
-        id: 'demo-editor',
-        email: 'editor@lumi.edu.vn',
-        displayName: customName || 'Hoàng Minh Quân (Biên tập viên)',
-        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-        bio: 'Biên tập viên các câu chuyện tử tế và sản phẩm truyền thông.',
-        province: 'Hồ Chí Minh',
-        role: 'EDITOR',
-        createdAt: '2026-02-01'
-      },
-      MODERATOR: {
-        id: 'demo-moderator',
-        email: 'moderator@lumi.edu.vn',
-        displayName: customName || 'Lê Bảo Châu (Kiểm duyệt viên)',
-        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=300&q=80',
-        bio: 'Kiểm duyệt viên Hộp thư yêu thương và Câu chuyện bạn gửi.',
-        province: 'Thừa Thiên Huế',
-        role: 'MODERATOR',
-        createdAt: '2026-02-15'
-      },
-      MEMBER: {
-        id: 'demo-member',
-        email: 'hocsinh.nguyendu@thpt.edu.vn',
-        displayName: customName || 'Nguyễn Minh Anh (Học sinh THPT)',
-        avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80',
-        bio: 'Học sinh lớp 11 – Yêu thích đọc truyện tử tế và gửi lời yêu thương.',
-        province: 'Nghệ An',
-        role: 'MEMBER',
-        createdAt: '2026-03-01'
-      },
-      GUEST: {
-        id: 'guest',
-        displayName: 'Khách vãng lai',
-        role: 'GUEST',
-        createdAt: new Date().toISOString().split('T')[0]
+  // Google Authentication: passes through server /api/auth/google-login
+  const loginWithGoogle = async (customEmail?: string, customName?: string): Promise<{ role: string; redirectUrl: string }> => {
+    const targetEmail = normalizeEmail(customEmail || 'nguyenhuy.thudaumot@gmail.com');
+    
+    // If Supabase OAuth is configured, initiate Supabase Google OAuth
+    if (supabase && !customEmail) {
+      try {
+        await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: `${window.location.origin}/auth/callback` }
+        });
+      } catch (e) {
+        console.warn('Supabase OAuth fallback to server auth:', e);
       }
-    };
+    }
 
-    setUser(demoProfiles[demoRole]);
-    setIsAuthModalOpen(false);
+    try {
+      const response = await apiService.loginWithGoogle(
+        targetEmail,
+        customName,
+        targetEmail.includes('hoanghuutrung')
+          ? 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=300&q=80'
+          : targetEmail.includes('nguyenhuy')
+          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
+          : 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80'
+      );
+
+      setUser(response.user);
+      setIsAuthModalOpen(false);
+      return { role: response.role, redirectUrl: response.redirectUrl };
+    } catch (err: any) {
+      console.error('Login error:', err);
+      throw err;
+    }
+  };
+
+  // Firebase Google Popup Authentication
+  const loginWithFirebasePopup = async (): Promise<{ role: string; redirectUrl: string }> => {
+    try {
+      const fbResult = await signInWithFirebaseGoogle();
+      if (!fbResult.email) {
+        throw new Error('Không lấy được email từ tài khoản Google.');
+      }
+      const response = await apiService.loginWithGoogle(
+        fbResult.email,
+        fbResult.displayName,
+        fbResult.photoURL || undefined
+      );
+
+      setUser(response.user);
+      setIsAuthModalOpen(false);
+      return { role: response.role, redirectUrl: response.redirectUrl };
+    } catch (err: any) {
+      console.error('Firebase login error:', err);
+      throw err;
+    }
   };
 
   const logout = () => {
+    if (supabase) {
+      supabase.auth.signOut().catch(() => {});
+    }
+    signOutFirebase().catch(() => {});
     setUser(null);
     setIsProfileDrawerOpen(false);
   };
@@ -269,7 +234,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoggedIn,
         isAdmin,
         isSuperAdmin,
-        isStaff,
         savedStoryIds,
         toggleBookmark,
         isStoryBookmarked,
@@ -278,8 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         markNotificationAsRead,
         markAllNotificationsAsRead,
         loginWithGoogle,
-        loginWithEmail,
-        loginAsDemo,
+        loginWithFirebasePopup,
         logout,
         updateProfile,
         isAuthModalOpen,

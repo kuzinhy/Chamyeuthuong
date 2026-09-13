@@ -8,7 +8,9 @@ import {
   StorySubmission,
   AuditLog,
   SiteSettings,
-  SongInfo
+  SongInfo,
+  KindnessPoint,
+  ResearchItem
 } from '../types';
 import { initialStories } from '../data/storiesData';
 import { initialLetters } from '../data/lettersData';
@@ -25,6 +27,8 @@ const KEYS = {
   SURVEYS: 'lumi_surveys_v3',
   MEDIA: 'lumi_media_v3',
   MUSIC: 'lumi_music_v3',
+  MAP_POINTS: 'lumi_map_points_v3',
+  RESEARCH: 'lumi_research_v3',
   SETTINGS: 'lumi_settings_v3',
   AUDIT_LOGS: 'lumi_audit_logs_v3',
 };
@@ -78,6 +82,130 @@ const initialAuditLogs: AuditLog[] = [
     entityTitle: 'Khởi tạo 8 câu chuyện tử tế ban đầu & 63 tỉnh thành',
     timestamp: '2026-05-15 08:00',
     details: 'Hệ thống đã nạp đầy đủ dữ liệu thực tế và chuẩn hóa SEO.'
+  }
+];
+
+const initialMapPoints: KindnessPoint[] = [
+  {
+    id: 'point-1',
+    title: 'Điểm tử tế Thủ Dầu Một',
+    province: 'Bình Dương',
+    region: 'Nam',
+    latitude: 11.1603,
+    longitude: 106.6575,
+    address: 'Ngã tư Hoàng Văn Thụ, TP. Thủ Dầu Một',
+    description: 'Nơi diễn ra câu chuyện cậu bé nhặt ve chai trả lại ví tiền có 15 triệu đồng.',
+    storyTitle: 'Cậu bé nhặt ve chai trả lại ví tiền',
+    storyCount: 2
+  },
+  {
+    id: 'point-2',
+    title: 'Lớp học 0 đồng Đom Đóm',
+    province: 'Đà Nẵng',
+    region: 'Trung',
+    latitude: 16.0544,
+    longitude: 108.2022,
+    address: 'Khu phố ven sông Cẩm Lệ, Đà Nẵng',
+    description: 'Lớp học dạy kèm miễn phí môn Toán và Anh Văn cho 30 em nhỏ khó khăn do nhóm HS Chuyên phụ trách.',
+    storyTitle: 'Lớp học 0 đồng cuối tuần',
+    storyCount: 4
+  },
+  {
+    id: 'point-3',
+    title: 'Chuyến xe cõng bạn vùng cao',
+    province: 'Hà Giang',
+    region: 'Bắc',
+    latitude: 22.8233,
+    longitude: 104.9839,
+    address: 'Điểm trường Mèo Vạc, Hà Giang',
+    description: '5 năm ròng rã cõng bạn khuyết tật qua 3 ngọn đồi đến lớp tìm con chữ.',
+    storyTitle: 'Chuyến xe yêu thương 5 năm',
+    storyCount: 2
+  },
+  {
+    id: 'point-4',
+    title: 'Tủ bánh mì & Nước mát học đường',
+    province: 'Hà Nội',
+    region: 'Bắc',
+    latitude: 21.0285,
+    longitude: 105.8542,
+    address: 'Khu vực Đống Đa, Hà Nội',
+    description: 'Điểm tiếp sức bữa sáng ấm áp cho học sinh và người lao động nghèo.',
+    storyTitle: 'Bữa sáng sẻ chia yêu thương',
+    storyCount: 4
+  },
+  {
+    id: 'point-5',
+    title: 'Trạm sách & Quyên góp tri thức',
+    province: 'Hồ Chí Minh',
+    region: 'Nam',
+    latitude: 10.8231,
+    longitude: 106.6297,
+    address: 'Quận 1, TP. Hồ Chí Minh',
+    description: 'Điểm tiếp nhận hơn 1.000 đầu sách giáo khoa và đồ dùng học tập gửi tặng học sinh vùng bão lũ.',
+    storyTitle: 'Trạm sách yêu thương tuổi trẻ',
+    storyCount: 5
+  }
+];
+
+const initialResearchItems: ResearchItem[] = [
+  {
+    id: 'res-1',
+    title: 'Tác động truyền thông thị giác có định hướng đến sự thay đổi hành vi trắc ẩn của học sinh THPT',
+    code: 'DT-LUMI-2025',
+    category: 'Khoa học hành vi',
+    sampleSize: '300 học sinh (Khối 10, 11, 12)',
+    author: 'Nhóm Nghiên Cứu LUMI',
+    spssScore: 'p < 0.001 (Ý nghĩa thống kê vượt trội)',
+    description: 'Nghiên cứu thực nghiệm chứng minh tác động kích hoạt tế bào thần kinh gương (Mirror Neurons) từ hình ảnh câu chuyện người tốt việc tốt.',
+    downloadUrl: '#',
+    publishedDate: '2026-05',
+    status: 'published'
+  },
+  {
+    id: 'res-2',
+    title: 'Khảo sát thực trạng mức độ thờ ơ và thấu cảm trong môi trường học đường số hóa',
+    code: 'DT-SURVEY-01',
+    category: 'Khảo sát thực nghiệm',
+    sampleSize: '500 học sinh',
+    author: 'Ban Cố Vấn Tâm Lý Học Đường',
+    spssScore: 'Hệ số Cronbach Alpha = 0.882',
+    description: 'Đo lường mức độ đồng cảm và biểu hiện hành vi giúp đỡ bạn bè trước bối cảnh bùng nổ mạng xã hội.',
+    downloadUrl: '#',
+    publishedDate: '2026-04',
+    status: 'published'
+  },
+  {
+    id: 'res-3',
+    title: 'Quy trình 5 bước can thiệp thấu cảm bằng âm nhạc tần số 432Hz và nghệ thuật thị giác',
+    code: 'DT-MUSIC-432',
+    category: 'Giải pháp can thiệp',
+    sampleSize: '120 học sinh can thiệp',
+    author: 'Dự án CHẠM IU THƯƠNG',
+    spssScore: 'Tỷ lệ cải thiện thái độ tích cực +42%',
+    description: 'Kết hợp liệu pháp sóng âm tần số sinh học 432Hz và hình ảnh nhân văn giúp giảm căng thẳng và mở rộng lòng trắc ẩn.',
+    downloadUrl: '#',
+    publishedDate: '2026-03',
+    status: 'published'
+  }
+];
+
+const initialMusicList: any[] = [
+  {
+    id: 'song-dieu-chua-noi',
+    slug: 'dieu-chua-noi',
+    title: 'Điều Chưa Nói',
+    artist: 'Dự Án LUMI x Nhóm Nhạc Học Sinh THPT Nguyễn Du',
+    composer: 'Dự Án Khoa Học Hành Vi LUMI',
+    coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
+    youtubeId: 'dQw4w9WgXcQ',
+    audioUrl: '',
+    frequency: '432Hz',
+    releaseDate: '2026-05',
+    description: 'Ca khúc chủ đề chính thức của Chiến dịch LUMI – CHẠM IU THƯƠNG. Bản hòa ca xoa dịu những tổn thương vô hình của tuổi học trò.',
+    message: 'Hãy dũng cảm cất lên những điều chưa nói để yêu thương được kết nối.',
+    status: 'published',
+    lyrics: 'Có những ngày sân trường bỗng thênh thang...\nChỉ riêng một góc nhỏ ngồi lặng im trong bóng râm...\nNhìn bằng trái tim, sẽ thấy những vết xước vô hình,\nHành động bằng yêu thương, xua tan mùa đông lạnh giá.'
   }
 ];
 
@@ -211,6 +339,12 @@ export const storageService = {
     storageService.addAuditLog('Từ chối bài gửi', 'StorySubmission', id);
     return updated;
   },
+  deleteSubmission: (id: string): StorySubmission[] => {
+    const updated = storageService.getSubmissions().filter(s => s.id !== id);
+    storageService.saveSubmissions(updated);
+    storageService.addAuditLog('Xóa bài đóng góp', 'StorySubmission', id);
+    return updated;
+  },
 
   // --- LOVE LETTERS ---
   getLetters: (): Letter[] => {
@@ -258,6 +392,14 @@ export const storageService = {
     const letters = storageService.getLetters().filter(l => l.id !== id);
     storageService.saveLetters(letters);
     storageService.addAuditLog('Xóa thư yêu thương', 'LoveLetter', id);
+    return letters;
+  },
+  updateLetter: (id: string, updates: Partial<Letter>): Letter[] => {
+    const letters = storageService.getLetters().map(l => 
+      l.id === id ? { ...l, ...updates } : l
+    );
+    storageService.saveLetters(letters);
+    storageService.addAuditLog('Cập nhật thư yêu thương', 'LoveLetter', id);
     return letters;
   },
   likeLetter: (id: string): Letter | null => {
@@ -380,6 +522,177 @@ export const storageService = {
     storageService.saveGallery(items);
     return updatedItem;
   },
+  addGalleryItem: (item: Partial<GalleryMediaItem>): GalleryMediaItem => {
+    const current = storageService.getGallery();
+    const newItem: GalleryMediaItem = {
+      id: item.id || `gal-${Date.now()}`,
+      title: item.title || 'Tác phẩm mới',
+      description: item.description || '',
+      category: item.category || 'Sản phẩm truyền thông',
+      imageUrl: item.imageUrl || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+      date: item.date || new Date().toLocaleDateString('vi-VN'),
+      credit: item.credit || 'LUMI Team',
+      source: item.source || 'Ban Truyền Thông',
+      likes: item.likes || 0,
+      tags: item.tags || ['LUMI']
+    };
+    const updated = [newItem, ...current];
+    storageService.saveGallery(updated);
+    storageService.addAuditLog('Thêm tác phẩm hình ảnh', 'Gallery', newItem.title);
+    return newItem;
+  },
+  updateGalleryItem: (id: string, updates: Partial<GalleryMediaItem>): GalleryMediaItem[] => {
+    const current = storageService.getGallery();
+    const updated = current.map(item => item.id === id ? { ...item, ...updates } : item);
+    storageService.saveGallery(updated);
+    storageService.addAuditLog('Cập nhật tác phẩm hình ảnh', 'Gallery', updates.title || id);
+    return updated;
+  },
+  deleteGalleryItem: (id: string): GalleryMediaItem[] => {
+    const current = storageService.getGallery();
+    const item = current.find(i => i.id === id);
+    const updated = current.filter(i => i.id !== id);
+    storageService.saveGallery(updated);
+    storageService.addAuditLog('Xóa tác phẩm hình ảnh', 'Gallery', item?.title || id);
+    return updated;
+  },
+
+  // --- MUSIC ---
+  getMusic: (): any[] => {
+    try {
+      const data = localStorage.getItem(KEYS.MUSIC);
+      return data ? JSON.parse(data) : initialMusicList;
+    } catch {
+      return initialMusicList;
+    }
+  },
+  saveMusic: (items: any[]) => {
+    localStorage.setItem(KEYS.MUSIC, JSON.stringify(items));
+  },
+  addMusicItem: (song: any): any => {
+    const current = storageService.getMusic();
+    const newSong = {
+      ...song,
+      id: song.id || `song-${Date.now()}`,
+      frequency: song.frequency || '432Hz',
+      status: song.status || 'published'
+    };
+    const updated = [newSong, ...current];
+    storageService.saveMusic(updated);
+    storageService.addAuditLog('Thêm bài hát mới', 'Music', newSong.title);
+    return newSong;
+  },
+  updateMusicItem: (id: string, updates: any): any[] => {
+    const current = storageService.getMusic();
+    const updated = current.map(s => s.id === id ? { ...s, ...updates } : s);
+    storageService.saveMusic(updated);
+    storageService.addAuditLog('Cập nhật bài hát', 'Music', updates.title || id);
+    return updated;
+  },
+  deleteMusicItem: (id: string): any[] => {
+    const current = storageService.getMusic();
+    const song = current.find(s => s.id === id);
+    const updated = current.filter(s => s.id !== id);
+    storageService.saveMusic(updated);
+    storageService.addAuditLog('Xóa bài hát', 'Music', song?.title || id);
+    return updated;
+  },
+
+  // --- MAP POINTS ---
+  getMapPoints: (): KindnessPoint[] => {
+    try {
+      const data = localStorage.getItem(KEYS.MAP_POINTS);
+      return data ? JSON.parse(data) : initialMapPoints;
+    } catch {
+      return initialMapPoints;
+    }
+  },
+  saveMapPoints: (points: KindnessPoint[]) => {
+    localStorage.setItem(KEYS.MAP_POINTS, JSON.stringify(points));
+  },
+  addMapPoint: (point: Partial<KindnessPoint>): KindnessPoint => {
+    const current = storageService.getMapPoints();
+    const newPoint: KindnessPoint = {
+      id: point.id || `point-${Date.now()}`,
+      title: point.title || 'Điểm tử tế mới',
+      province: point.province || 'Bình Dương',
+      region: point.region || 'Nam',
+      latitude: point.latitude || 10.8231,
+      longitude: point.longitude || 106.6297,
+      address: point.address || '',
+      description: point.description || '',
+      storyTitle: point.storyTitle || '',
+      storyCount: point.storyCount || 1,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newPoint, ...current];
+    storageService.saveMapPoints(updated);
+    storageService.addAuditLog('Thêm điểm bản đồ', 'MapPoint', newPoint.title);
+    return newPoint;
+  },
+  updateMapPoint: (id: string, updates: Partial<KindnessPoint>): KindnessPoint[] => {
+    const current = storageService.getMapPoints();
+    const updated = current.map(p => p.id === id ? { ...p, ...updates } : p);
+    storageService.saveMapPoints(updated);
+    storageService.addAuditLog('Cập nhật điểm bản đồ', 'MapPoint', updates.title || id);
+    return updated;
+  },
+  deleteMapPoint: (id: string): KindnessPoint[] => {
+    const current = storageService.getMapPoints();
+    const point = current.find(p => p.id === id);
+    const updated = current.filter(p => p.id !== id);
+    storageService.saveMapPoints(updated);
+    storageService.addAuditLog('Xóa điểm bản đồ', 'MapPoint', point?.title || id);
+    return updated;
+  },
+
+  // --- RESEARCH ---
+  getResearch: (): ResearchItem[] => {
+    try {
+      const data = localStorage.getItem(KEYS.RESEARCH);
+      return data ? JSON.parse(data) : initialResearchItems;
+    } catch {
+      return initialResearchItems;
+    }
+  },
+  saveResearch: (items: ResearchItem[]) => {
+    localStorage.setItem(KEYS.RESEARCH, JSON.stringify(items));
+  },
+  addResearchItem: (item: Partial<ResearchItem>): ResearchItem => {
+    const current = storageService.getResearch();
+    const newItem: ResearchItem = {
+      id: item.id || `res-${Date.now()}`,
+      title: item.title || 'Đề tài nghiên cứu mới',
+      code: item.code || `DT-${Date.now().toString().slice(-4)}`,
+      category: item.category || 'Khoa học hành vi',
+      sampleSize: item.sampleSize || '300 học sinh',
+      author: item.author || 'LUMI Research Team',
+      spssScore: item.spssScore || 'p < 0.001',
+      description: item.description || '',
+      downloadUrl: item.downloadUrl || '#',
+      publishedDate: item.publishedDate || new Date().toISOString().split('T')[0],
+      status: item.status || 'published'
+    };
+    const updated = [newItem, ...current];
+    storageService.saveResearch(updated);
+    storageService.addAuditLog('Thêm đề tài nghiên cứu', 'Research', newItem.title);
+    return newItem;
+  },
+  updateResearchItem: (id: string, updates: Partial<ResearchItem>): ResearchItem[] => {
+    const current = storageService.getResearch();
+    const updated = current.map(r => r.id === id ? { ...r, ...updates } : r);
+    storageService.saveResearch(updated);
+    storageService.addAuditLog('Cập nhật đề tài nghiên cứu', 'Research', updates.title || id);
+    return updated;
+  },
+  deleteResearchItem: (id: string): ResearchItem[] => {
+    const current = storageService.getResearch();
+    const item = current.find(r => r.id === id);
+    const updated = current.filter(r => r.id !== id);
+    storageService.saveResearch(updated);
+    storageService.addAuditLog('Xóa đề tài nghiên cứu', 'Research', item?.title || id);
+    return updated;
+  },
 
   // --- SURVEYS ---
   getSurveys: (): SurveySubmission[] => {
@@ -487,6 +800,9 @@ export const storageService = {
       submissions: storageService.getSubmissions(),
       letters: storageService.getLetters(),
       gallery: storageService.getGallery(),
+      music: storageService.getMusic(),
+      mapPoints: storageService.getMapPoints(),
+      research: storageService.getResearch(),
       surveys: storageService.getSurveys(),
       settings: storageService.getSiteSettings(),
       auditLogs: storageService.getAuditLogs(),
@@ -501,6 +817,9 @@ export const storageService = {
     localStorage.setItem(KEYS.LETTERS, JSON.stringify(initialLetters));
     localStorage.setItem(KEYS.PHOTOVOICE, JSON.stringify(initialPhotovoice));
     localStorage.setItem(KEYS.GALLERY, JSON.stringify(initialGalleryItems));
+    localStorage.setItem(KEYS.MUSIC, JSON.stringify(initialMusicList));
+    localStorage.setItem(KEYS.MAP_POINTS, JSON.stringify(initialMapPoints));
+    localStorage.setItem(KEYS.RESEARCH, JSON.stringify(initialResearchItems));
     localStorage.setItem(KEYS.SETTINGS, JSON.stringify(initialSettings));
     localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(initialAuditLogs));
   }

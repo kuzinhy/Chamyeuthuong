@@ -10,6 +10,7 @@ export interface UserProfile {
   bio?: string;
   province?: string;
   role: UserRole;
+  is_protected_admin?: boolean;
   createdAt: string;
 }
 
@@ -58,6 +59,10 @@ export interface Story {
   readTime: string;
   seoTitle?: string;
   seoDescription?: string;
+  version?: number;
+  updatedBy?: string;
+  updatedAt?: string;
+  publishedAt?: string;
 }
 
 export interface StorySubmission {
@@ -266,6 +271,34 @@ export interface ProvinceData {
   storyCount: number;
 }
 
+export interface KindnessPoint {
+  id: string;
+  title: string;
+  province: string;
+  region: RegionType;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  description: string;
+  storyTitle?: string;
+  storyCount?: number;
+  createdAt?: string;
+}
+
+export interface ResearchItem {
+  id: string;
+  title: string;
+  code: string;
+  category: 'Khoa học hành vi' | 'Khảo sát thực nghiệm' | 'Giải pháp can thiệp' | 'Báo cáo SPSS' | 'Tài liệu tham khảo';
+  sampleSize?: string;
+  author: string;
+  spssScore?: string;
+  description: string;
+  downloadUrl?: string;
+  publishedDate?: string;
+  status: 'published' | 'draft';
+}
+
 export interface UserNotification {
   id: string;
   userId: string;
@@ -312,4 +345,5 @@ export type ActiveNavPage =
   | 'survey'
   | 'exhibition'
   | 'admin'
-  | 'profile';
+  | 'profile'
+  | 'dang-nhap';

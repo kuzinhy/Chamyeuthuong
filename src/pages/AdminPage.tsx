@@ -1,45 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShieldCheck, 
-  Check, 
-  X, 
-  Trash2, 
-  Mail, 
-  BarChart2, 
   BookOpen, 
-  Camera, 
-  Download, 
+  MapPin, 
+  Mail, 
+  Music, 
+  Image as ImageIcon, 
+  GraduationCap, 
+  Send, 
+  Settings, 
+  Users, 
+  LogOut, 
+  ExternalLink,
   Sparkles,
-  Plus,
-  Edit3,
-  Search,
-  Eye,
-  Heart,
-  Send,
-  Settings,
-  History,
-  Database,
-  CheckCircle2,
+  Radio,
   Clock,
-  AlertTriangle,
-  UserCheck,
-  RefreshCw,
-  MapPin,
-  Image as ImageIcon
+  Layers,
+  CheckCircle2,
+  ChevronRight,
+  HelpCircle,
+  Compass,
+  ChevronDown,
+  Menu
 } from 'lucide-react';
 import { 
+  Story, 
   Letter, 
   PhotovoiceItem, 
-  Story, 
   SurveySubmission, 
   StorySubmission, 
-  AuditLog, 
-  SiteSettings 
+  KindnessPoint, 
+  ResearchItem, 
+  GalleryMediaItem, 
+  SiteSettings,
+  ActiveNavPage,
+  AuditLog
 } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { apiService, PresenceInfo } from '../services/api';
 import { storageService } from '../services/storage';
-import { vietnameseProvinces } from '../data/provincesData';
+import { Forbidden403Page } from './Forbidden403Page';
+import { PROTECTED_ADMIN_EMAILS } from '../utils/adminAuth';
+
+// Admin Sub-components
+import { AdminStoriesTab } from '../components/admin/AdminStoriesTab';
+import { AdminMapTab } from '../components/admin/AdminMapTab';
+import { AdminLettersTab } from '../components/admin/AdminLettersTab';
+import { AdminMusicTab } from '../components/admin/AdminMusicTab';
+import { AdminGalleryTab } from '../components/admin/AdminGalleryTab';
+import { AdminResearchTab } from '../components/admin/AdminResearchTab';
+import { AdminSubmissionsTab } from '../components/admin/AdminSubmissionsTab';
+import { AdminSettingsTab } from '../components/admin/AdminSettingsTab';
+import { AdminAuditTab } from '../components/admin/AdminAuditTab';
 
 interface AdminPageProps {
   letters: Letter[];
@@ -57,7 +70,19 @@ interface AdminPageProps {
   onDeleteStory?: (id: string) => void;
   onConvertSubmission?: (submissionId: string) => void;
   onRejectSubmission?: (submissionId: string, feedback?: string) => void;
+  onNavigate?: (page: ActiveNavPage) => void;
 }
+
+export type AdminTabType = 
+  | 'stories'
+  | 'map'
+  | 'letters'
+  | 'music'
+  | 'gallery'
+  | 'research'
+  | 'submissions'
+  | 'settings'
+  | 'audit';
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   letters,
@@ -74,1088 +99,700 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onUpdateStory,
   onDeleteStory,
   onConvertSubmission,
-  onRejectSubmission
+  onRejectSubmission,
+  onNavigate
 }) => {
-  const { user, role, isSuperAdmin, isStaff } = useAuth();
+  const { user, role, isAdmin, isSuperAdmin, logout } = useAuth();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'stories' | 'submissions' | 'letters' | 'photovoice' | 'surveys' | 'settings' | 'logs'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<AdminTabType>('stories');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
-  const [searchQuery, setSearchQuery] = useState('');
-  
-  // Story Editor Modal state
-  const [isStoryModalOpen, setIsStoryModalOpen] = useState(false);
-  const [editingStoryId, setEditingStoryId] = useState<string | null>(null);
-  const [storyForm, setStoryForm] = useState<Partial<Story>>({
-    title: '',
-    excerpt: '',
-    content: '',
-    province: 'Hà Nội',
-    region: 'Bắc',
-    category: 'Trung thực',
-    coverImage: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=80',
-    sourceName: 'LUMI – Chạm Yêu Thương',
-    sourceUrl: 'https://lumi.edu.vn',
-    message: 'Mỗi hành động tử tế đều thắp sáng một niềm tin.',
-    featured: false,
-    status: 'published'
-  });
+  // Real-time presences state
+  const [presences, setPresences] = useState<PresenceInfo[]>([]);
 
-  // Site Settings state
+  // Collections state managed within Admin
+  const [mapPoints, setMapPoints] = useState<KindnessPoint[]>(() => storageService.getMapPoints());
+  const [musicList, setMusicList] = useState<any[]>(() => storageService.getMusic());
+  const [galleryItems, setGalleryItems] = useState<GalleryMediaItem[]>(() => storageService.getGallery());
+  const [researchItems, setResearchItems] = useState<ResearchItem[]>(() => storageService.getResearch());
   const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => storageService.getSiteSettings());
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => storageService.getAuditLogs());
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
 
-  // Survey Analytics
-  const preSurveys = surveys.filter(s => s.surveyType === 'pre-test');
-  const postSurveys = surveys.filter(s => s.surveyType === 'post-test');
+  // Sync with server API on mount
+  useEffect(() => {
+    const syncData = async () => {
+      try {
+        const [serverPoints, serverMusic, serverGallery, serverResearch, serverSettings] = await Promise.all([
+          apiService.getMapPoints().catch(() => null),
+          apiService.getMusicItems().catch(() => null),
+          apiService.getGalleryItems().catch(() => null),
+          apiService.getResearchItems().catch(() => null),
+          apiService.getSettings().catch(() => null)
+        ]);
 
-  const calculateAverage = (surveyList: SurveySubmission[], prefix: 'ND' | 'TX' | 'TA') => {
-    if (surveyList.length === 0) return 0;
-    let sum = 0;
-    let count = 0;
-    surveyList.forEach(s => {
-      const scoreObj = prefix === 'ND' ? s.ndScores : prefix === 'TX' ? s.txScores : s.taScores;
-      Object.values(scoreObj).forEach((val) => {
-        sum += val;
-        count += 1;
-      });
-    });
-    return count > 0 ? Number((sum / count).toFixed(2)) : 0;
-  };
+        if (serverPoints) setMapPoints(serverPoints);
+        if (serverMusic) setMusicList(serverMusic);
+        if (serverGallery) setGalleryItems(serverGallery);
+        if (serverResearch) setResearchItems(serverResearch);
+        if (serverSettings) setSiteSettings(serverSettings);
+      } catch {
+        // Fall back to storageService defaults
+      }
+    };
 
-  const preND = calculateAverage(preSurveys, 'ND') || 3.12;
-  const postND = calculateAverage(postSurveys, 'ND') || 4.45;
-  const preTX = calculateAverage(preSurveys, 'TX') || 2.88;
-  const postTX = calculateAverage(postSurveys, 'TX') || 4.38;
-  const preTA = calculateAverage(preSurveys, 'TA') || 2.65;
-  const postTA = calculateAverage(postSurveys, 'TA') || 4.52;
+    syncData();
+  }, []);
 
-  const handleExportCSV = () => {
-    const headers = 'ID,Loai,GioiTinh,KhoiLop,ThoiGian,DiemTB_ND,DiemTB_TX,DiemTB_TA\n';
-    const rows = surveys.map(s => {
-      return `"${s.id}","${s.surveyType}","${s.demographics.gender}","${s.demographics.grade}","${s.submittedAt}",${s.averageND},${s.averageTX},${s.averageTA}`;
-    }).join('\n');
+  // Real-time heartbeat / presence ping
+  useEffect(() => {
+    if (!user || !isAdmin) return;
 
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `LUMI_Survey_SPSS_Export_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Đã xuất file dữ liệu SPSS thành công!', { type: 'success' });
-  };
+    const ping = async () => {
+      try {
+        const activeList = await apiService.sendPresence(
+          user.email,
+          user.displayName || user.email.split('@')[0],
+          activeTab
+        );
+        setPresences(activeList);
+      } catch {
+        // quiet fallback
+      }
+    };
 
-  const handleExportFullJSON = () => {
-    const jsonStr = storageService.exportFullDatabaseJSON();
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `LUMI_Full_Backup_${new Date().toISOString().slice(0,10)}.json`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Đã xuất bản sao lưu hệ thống toàn vẹn!', { type: 'success' });
-  };
+    ping();
+    const interval = setInterval(ping, 10000);
+    return () => clearInterval(interval);
+  }, [user, isAdmin, activeTab]);
 
-  const handleSaveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    storageService.saveSiteSettings(siteSettings);
-    setAuditLogs(storageService.getAuditLogs());
-    showToast('Đã lưu cấu hình website thành công!', { type: 'success' });
-  };
-
-  const handleOpenNewStoryModal = () => {
-    setEditingStoryId(null);
-    setStoryForm({
-      title: '',
-      excerpt: '',
-      content: '',
-      province: 'Hà Nội',
-      region: 'Bắc',
-      category: 'Trung thực',
-      coverImage: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=80',
-      sourceName: 'LUMI – Chạm Yêu Thương',
-      sourceUrl: 'https://lumi.edu.vn',
-      message: 'Mỗi hành động tử tế đều thắp sáng một niềm tin.',
-      featured: false,
-      status: 'published'
-    });
-    setIsStoryModalOpen(true);
-  };
-
-  const handleOpenEditStoryModal = (story: Story) => {
-    setEditingStoryId(story.id);
-    setStoryForm({ ...story });
-    setIsStoryModalOpen(true);
-  };
-
-  const handleSaveStoryForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!storyForm.title || !storyForm.content) {
-      showToast('Vui lòng điền đủ tiêu đề và nội dung', { type: 'warning' });
-      return;
+  // Load audit logs from server
+  const loadLogs = useCallback(async () => {
+    if (!user) return;
+    setIsLoadingLogs(true);
+    try {
+      const logs = await apiService.getAuditLogs(user.email);
+      setAuditLogs(logs);
+    } catch {
+      setAuditLogs(storageService.getAuditLogs());
+    } finally {
+      setIsLoadingLogs(false);
     }
+  }, [user]);
 
-    if (editingStoryId && onUpdateStory) {
-      onUpdateStory(editingStoryId, storyForm);
-      showToast('Đã cập nhật bài viết thành công!', { type: 'success' });
-    } else {
-      const newStory: Story = {
-        id: `story-${Date.now()}`,
-        slug: (storyForm.title || 'bai-viet').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
-        title: storyForm.title || '',
-        excerpt: storyForm.excerpt || (storyForm.content?.slice(0, 160) + '...'),
-        content: storyForm.content || '',
-        coverImage: storyForm.coverImage || 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=80',
-        province: storyForm.province || 'Hà Nội',
-        region: storyForm.region || 'Bắc',
-        latitude: 21.0285,
-        longitude: 105.8542,
-        category: storyForm.category || 'Trung thực',
-        tags: storyForm.tags || ['Lòng trắc ẩn', 'Học đường', storyForm.province || ''],
-        message: storyForm.message || 'Mỗi hành động tử tế đều thắp sáng một niềm tin.',
-        sourceName: storyForm.sourceName || 'LUMI',
-        sourceUrl: storyForm.sourceUrl || 'https://lumi.edu.vn',
-        sourcePublishDate: new Date().toISOString().split('T')[0],
-        author: storyForm.author || user?.displayName || 'Ban Biên Tập LUMI',
-        featured: !!storyForm.featured,
-        status: storyForm.status || 'published',
-        views: 1,
-        likes: 0,
-        readTime: '3 phút đọc'
-      };
-      onAddStory(newStory);
-      showToast('Đã tạo bài viết mới thành công!', { type: 'success' });
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      loadLogs();
     }
+  }, [activeTab, loadLogs]);
 
-    setAuditLogs(storageService.getAuditLogs());
-    setIsStoryModalOpen(false);
+  // Guard: User must be authenticated and is Admin
+  if (!user || !isAdmin) {
+    return <Forbidden403Page onNavigate={onNavigate || (() => {})} />;
+  }
+
+  // --- CRUD HANDLERS FOR MAP POINTS ---
+  const handleAddMapPoint = async (point: Partial<KindnessPoint>) => {
+    const created = storageService.addMapPoint(point);
+    setMapPoints(storageService.getMapPoints());
+    try {
+      await apiService.createMapPoint(point, user.email);
+    } catch {
+      // already in localStorage
+    }
+    showToast('Đã thêm điểm tử tế mới vào bản đồ', { type: 'success' });
   };
 
-  const pendingLetters = letters.filter(l => l.status === 'pending');
-  const pendingSubmissions = submissions.filter(s => s.status === 'pending');
-  const pendingPhotovoice = photovoiceItems.filter(p => p.status === 'pending');
-  const totalLikes = stories.reduce((acc, curr) => acc + (curr.likes || 0), 0) + letters.reduce((acc, curr) => acc + (curr.likes || 0), 0);
+  const handleUpdateMapPoint = async (id: string, updates: Partial<KindnessPoint>) => {
+    const updated = storageService.updateMapPoint(id, updates);
+    setMapPoints(updated);
+    try {
+      await apiService.updateMapPoint(id, updates, user.email);
+    } catch {
+      // local updated
+    }
+    showToast('Đã cập nhật điểm bản đồ thành công', { type: 'success' });
+  };
+
+  const handleDeleteMapPoint = async (id: string) => {
+    const updated = storageService.deleteMapPoint(id);
+    setMapPoints(updated);
+    try {
+      await apiService.deleteMapPoint(id, user.email);
+    } catch {
+      // local updated
+    }
+    showToast('Đã xóa điểm tử tế khỏi bản đồ', { type: 'info' });
+  };
+
+  // --- CRUD HANDLERS FOR MUSIC ---
+  const handleAddMusic = async (song: any) => {
+    const created = storageService.addMusicItem(song);
+    setMusicList(storageService.getMusic());
+    try {
+      await apiService.createMusicItem(song, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã thêm ca khúc mới vào Góc âm nhạc 432Hz', { type: 'success' });
+  };
+
+  const handleUpdateMusic = async (id: string, updates: any) => {
+    const updated = storageService.updateMusicItem(id, updates);
+    setMusicList(updated);
+    try {
+      await apiService.updateMusicItem(id, updates, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã cập nhật thông tin ca khúc', { type: 'success' });
+  };
+
+  const handleDeleteMusic = async (id: string) => {
+    const updated = storageService.deleteMusicItem(id);
+    setMusicList(updated);
+    try {
+      await apiService.deleteMusicItem(id, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã xóa bài hát khỏi hệ thống', { type: 'info' });
+  };
+
+  // --- CRUD HANDLERS FOR GALLERY ---
+  const handleAddGalleryItem = async (item: Partial<GalleryMediaItem>) => {
+    const created = storageService.addGalleryItem(item);
+    setGalleryItems(storageService.getGallery());
+    try {
+      await apiService.createGalleryItem(item, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã đăng tác phẩm hình ảnh mới', { type: 'success' });
+  };
+
+  const handleUpdateGalleryItem = async (id: string, updates: Partial<GalleryMediaItem>) => {
+    const updated = storageService.updateGalleryItem(id, updates);
+    setGalleryItems(updated);
+    try {
+      await apiService.updateGalleryItem(id, updates, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã cập nhật tác phẩm hình ảnh', { type: 'success' });
+  };
+
+  const handleDeleteGalleryItem = async (id: string) => {
+    const updated = storageService.deleteGalleryItem(id);
+    setGalleryItems(updated);
+    try {
+      await apiService.deleteGalleryItem(id, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã xóa tác phẩm khỏi thư viện', { type: 'info' });
+  };
+
+  // --- CRUD HANDLERS FOR RESEARCH ---
+  const handleAddResearch = async (item: Partial<ResearchItem>) => {
+    const created = storageService.addResearchItem(item);
+    setResearchItems(storageService.getResearch());
+    try {
+      await apiService.createResearchItem(item, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã thêm đề tài nghiên cứu khoa học mới', { type: 'success' });
+  };
+
+  const handleUpdateResearch = async (id: string, updates: Partial<ResearchItem>) => {
+    const updated = storageService.updateResearchItem(id, updates);
+    setResearchItems(updated);
+    try {
+      await apiService.updateResearchItem(id, updates, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã cập nhật đề tài nghiên cứu', { type: 'success' });
+  };
+
+  const handleDeleteResearch = async (id: string) => {
+    const updated = storageService.deleteResearchItem(id);
+    setResearchItems(updated);
+    try {
+      await apiService.deleteResearchItem(id, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã xóa đề tài khỏi danh mục nghiên cứu', { type: 'info' });
+  };
+
+  // --- SETTINGS HANDLER ---
+  const handleSaveSettings = async (newSettings: SiteSettings) => {
+    storageService.saveSiteSettings(newSettings);
+    setSiteSettings(newSettings);
+    try {
+      await apiService.updateSettings(newSettings, user.email);
+    } catch {
+      // local
+    }
+    showToast('Đã lưu cấu hình chung website', { type: 'success' });
+  };
+
+  // Count pending submissions
+  const pendingSubmissionsCount = submissions.filter(s => s.status === 'pending').length;
+  const pendingLettersCount = letters.filter(l => l.status === 'pending').length;
+  const otherAdminsOnline = presences.filter(p => p.userId?.toLowerCase() !== user.email.toLowerCase()).length;
+
+  // 9 functional modules organized into 3 clear categories for the vertical left sidebar
+  const menuCategories = [
+    {
+      title: 'Nội Dung Tử Tế',
+      items: [
+        {
+          id: 'stories' as AdminTabType,
+          label: '1. Câu chuyện tử tế',
+          icon: BookOpen,
+          badge: (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'stories' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {stories.length}
+            </span>
+          )
+        },
+        {
+          id: 'map' as AdminTabType,
+          label: '2. Bản đồ tử tế',
+          icon: Compass,
+          badge: (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'map' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {mapPoints.length}
+            </span>
+          )
+        },
+        {
+          id: 'letters' as AdminTabType,
+          label: '3. Hộp thư yêu thương',
+          icon: Mail,
+          badge: pendingLettersCount > 0 ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
+              {pendingLettersCount} chờ
+            </span>
+          ) : (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'letters' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {letters.length}
+            </span>
+          )
+        },
+        {
+          id: 'music' as AdminTabType,
+          label: '4. Góc âm nhạc 432Hz',
+          icon: Music,
+          badge: (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'music' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {musicList.length}
+            </span>
+          )
+        },
+        {
+          id: 'gallery' as AdminTabType,
+          label: '5. Hình ảnh & Photovoice',
+          icon: ImageIcon,
+          badge: (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'gallery' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {galleryItems.length + photovoiceItems.length}
+            </span>
+          )
+        },
+        {
+          id: 'research' as AdminTabType,
+          label: '6. Đề tài nghiên cứu',
+          icon: GraduationCap,
+          badge: (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'research' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {researchItems.length}
+            </span>
+          )
+        }
+      ]
+    },
+    {
+      title: 'Tiếp Nhận & Đóng Góp',
+      items: [
+        {
+          id: 'submissions' as AdminTabType,
+          label: '7. Bài đóng góp (Kể LUMI)',
+          icon: Send,
+          badge: pendingSubmissionsCount > 0 ? (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-sky-100 text-sky-800 border border-sky-300 animate-pulse">
+              {pendingSubmissionsCount} mới
+            </span>
+          ) : (
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
+              activeTab === 'submissions' 
+                ? 'bg-white/20 text-white border border-white/30' 
+                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
+            }`}>
+              {submissions.length}
+            </span>
+          )
+        }
+      ]
+    },
+    {
+      title: 'Hệ Thống & Điều Hành',
+      items: [
+        {
+          id: 'settings' as AdminTabType,
+          label: '8. Cấu hình website',
+          icon: Settings,
+          badge: undefined
+        },
+        {
+          id: 'audit' as AdminTabType,
+          label: '9. Quản trị & Kiểm toán',
+          icon: Users,
+          badge: (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+              Online
+            </span>
+          )
+        }
+      ]
+    }
+  ];
 
   return (
-    <div className="pt-28 pb-20 sm:pb-32 bg-[#faf8f5] min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-sky-50/70 via-blue-50/40 to-slate-50 text-slate-800 relative overflow-hidden font-sans selection:bg-sky-500 selection:text-white pt-20 pb-20">
+      {/* High-tech Blue Glow / Ambient Soft Lighting */}
+      <div className="absolute top-0 left-1/4 w-[32rem] h-[32rem] bg-sky-200/35 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 right-10 w-[30rem] h-[30rem] bg-cyan-200/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 left-10 w-[26rem] h-[26rem] bg-blue-200/25 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-[1560px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-6">
         
-        {/* Header Banner */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-sky-100">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-900 text-white text-xs font-bold">
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-300" />
-              <span>LUMI Content Management System (CMS) & Research Hub</span>
-            </div>
-            <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-slate-900 mt-2">
-              Bảng Điều Khiển Quản Trị & Kiểm Duyệt
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Người vận hành: <strong>{user?.displayName}</strong> ({role})
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleExportFullJSON}
-              className="px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Database className="w-3.5 h-3.5 text-sky-500" />
-              <span>Sao Lưu JSON</span>
-            </button>
-
-            <span className="text-xs font-bold px-3 py-2 rounded-xl bg-emerald-100 text-emerald-800 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {siteSettings.isMaintenanceMode ? 'Chế độ Bảo Trì' : 'Đang Hoạt Động'}
-            </span>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-200 scrollbar-none">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeTab === 'overview'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <BarChart2 className="w-4 h-4" />
-            <span>Tổng Quan</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('stories')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeTab === 'stories'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Câu Chuyện Tử Tế ({stories.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('submissions')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 relative ${
-              activeTab === 'submissions'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-            <span>Kể LUMI Nghe ({submissions.length})</span>
-            {pendingSubmissions.length > 0 && (
-              <span className="px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                {pendingSubmissions.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('letters')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 relative ${
-              activeTab === 'letters'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <Mail className="w-4 h-4" />
-            <span>Hộp Thư Yêu Thương ({letters.length})</span>
-            {pendingLetters.length > 0 && (
-              <span className="px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-bold">
-                {pendingLetters.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('photovoice')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeTab === 'photovoice'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <Camera className="w-4 h-4" />
-            <span>Photovoice ({photovoiceItems.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('surveys')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeTab === 'surveys'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <BarChart2 className="w-4 h-4" />
-            <span>Khảo Sát & SPSS ({surveys.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeTab === 'settings'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>Cấu Hình Web</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer flex items-center gap-2 ${
-              activeTab === 'logs'
-                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                : 'bg-white text-slate-600 hover:bg-sky-50 border border-slate-200'
-            }`}
-          >
-            <History className="w-4 h-4" />
-            <span>Nhật Ký Thao Tác</span>
-          </button>
-        </div>
-
-        {/* TAB 1: OVERVIEW DASHBOARD */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-3xl border border-sky-100 shadow-sm space-y-1">
-                <span className="text-[11px] font-bold text-sky-600 uppercase tracking-wider">Bài viết đã xuất bản</span>
-                <p className="text-3xl font-extrabold text-slate-800">{stories.length}</p>
-                <p className="text-[11px] text-slate-400">Trên 63 tỉnh thành Việt Nam</p>
+        {/* Top Command Bar: Modern Tech Blue & Clean White */}
+        <div className="bg-white/95 backdrop-blur-xl border border-sky-100/90 rounded-3xl p-5 shadow-lg shadow-sky-500/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-cyan-500 to-blue-600 p-0.5 shadow-md shadow-sky-500/20 flex items-center justify-center">
+                <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6 text-sky-600" />
+                </div>
               </div>
-
-              <div className="bg-white p-5 rounded-3xl border border-amber-100 shadow-sm space-y-1">
-                <span className="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Bài gửi chờ duyệt</span>
-                <p className="text-3xl font-extrabold text-slate-800">{pendingSubmissions.length}</p>
-                <p className="text-[11px] text-slate-400">Từ mục "Kể LUMI nghe"</p>
-              </div>
-
-              <div className="bg-white p-5 rounded-3xl border border-rose-100 shadow-sm space-y-1">
-                <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Thư yêu thương chờ duyệt</span>
-                <p className="text-3xl font-extrabold text-slate-800">{pendingLetters.length}</p>
-                <p className="text-[11px] text-slate-400">Từ học sinh & cộng đồng</p>
-              </div>
-
-              <div className="bg-white p-5 rounded-3xl border border-purple-100 shadow-sm space-y-1">
-                <span className="text-[11px] font-bold text-purple-600 uppercase tracking-wider">Tổng lượt chạm yêu thương</span>
-                <p className="text-3xl font-extrabold text-slate-800">{totalLikes}</p>
-                <p className="text-[11px] text-slate-400">Tương tác thả tim lan tỏa</p>
-              </div>
+              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white ring-2 ring-emerald-400/40" />
             </div>
 
-            {/* Quick Actions & Recent Submissions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-800">Bài gửi học sinh gần đây (Kể LUMI nghe)</h3>
-                  <button
-                    onClick={() => setActiveTab('submissions')}
-                    className="text-xs font-bold text-sky-600 hover:text-sky-700"
-                  >
-                    Xem tất cả ({submissions.length})
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {submissions.slice(0, 3).map(sub => (
-                    <div key={sub.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
-                      <div className="min-w-0 flex-1 pr-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-sky-600">{sub.province}</span>
-                          <span className="text-[10px] text-slate-400">• {sub.submittedAt}</span>
-                        </div>
-                        <h4 className="text-xs font-bold text-slate-800 truncate mt-0.5">{sub.title}</h4>
-                        <p className="text-[11px] text-slate-500">Tác giả: {sub.authorName}</p>
-                      </div>
-
-                      {sub.status === 'pending' && onConvertSubmission && (
-                        <button
-                          onClick={() => onConvertSubmission(sub.id)}
-                          className="px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-[11px] font-bold shrink-0 cursor-pointer"
-                        >
-                          Duyệt & Đăng
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-display font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>Trung Tâm Quản Trị Hệ Thống LUMI</span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200 uppercase tracking-wider">
+                    CMS 2.0
+                  </span>
+                </h1>
               </div>
-
-              <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-800">Hộp thư yêu thương mới nhất</h3>
-                  <button
-                    onClick={() => setActiveTab('letters')}
-                    className="text-xs font-bold text-rose-600 hover:text-rose-700"
-                  >
-                    Xem tất cả ({letters.length})
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {letters.slice(0, 3).map(letItem => (
-                    <div key={letItem.id} className="p-3.5 rounded-2xl bg-rose-50/40 border border-rose-100 flex items-center justify-between">
-                      <div className="min-w-0 flex-1 pr-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-rose-600">{letItem.category}</span>
-                          <span className="text-[10px] text-slate-400">• {letItem.createdAt}</span>
-                        </div>
-                        <p className="text-xs text-slate-700 italic truncate mt-0.5">"{letItem.content}"</p>
-                        <p className="text-[11px] text-slate-500">Người gửi: {letItem.senderName}</p>
-                      </div>
-
-                      {letItem.status === 'pending' && (
-                        <button
-                          onClick={() => onApproveLetter(letItem.id, 'Cảm ơn tấm lòng thơm thảo của bạn!')}
-                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shrink-0 cursor-pointer"
-                        >
-                          Duyệt
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>Quản trị viên: <strong className="text-sky-700 font-bold">{user.email}</strong></span>
+                <span className="text-slate-300">•</span>
+                <span className="text-emerald-700 font-semibold flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  {otherAdminsOnline > 0 ? `Có ${otherAdminsOnline} quản trị viên khác đang online` : 'Hệ thống an toàn / Trực tuyến'}
+                </span>
+              </p>
             </div>
           </div>
-        )}
 
-        {/* TAB 2: STORIES MANAGEMENT & EDITOR */}
-        {activeTab === 'stories' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="relative flex-1 max-w-md">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm bài viết theo tiêu đề, tỉnh thành..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-sky-500 bg-white"
-                />
-              </div>
-
+          {/* Quick Action Buttons */}
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            {onNavigate && (
               <button
-                onClick={handleOpenNewStoryModal}
-                className="px-4 py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-sky-500/20 cursor-pointer"
+                onClick={() => onNavigate('home')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
-                <span>Viết Câu Chuyện Mới</span>
+                <ExternalLink className="w-3.5 h-3.5 text-sky-600" />
+                <span>Xem Trang Công Khai</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => logout()}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition-all cursor-pointer shadow-2xs"
+              title="Đăng xuất khỏi hệ thống quản trị"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Đăng xuất</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2-Column Command Workspace: Vertical Left Sidebar & Right Dynamic Content Area */}
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          
+          {/* LEFT VERTICAL SIDEBAR MENU (Mép trái - Tone Xanh, Trắng, Nhạt) */}
+          <aside className="w-full lg:w-72 xl:w-80 flex-shrink-0 lg:sticky lg:top-24 space-y-4">
+            
+            {/* Mobile Expand / Collapse Bar */}
+            <div className="lg:hidden bg-white/95 border border-sky-100 rounded-2xl p-3 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-sky-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  {menuCategories.flatMap(c => c.items).find(i => i.id === activeTab)?.label || 'Chọn phân hệ'}
+                </span>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-xs font-bold text-sky-700 border border-sky-200 flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <span>{mobileMenuOpen ? 'Đóng menu' : 'Đổi phân hệ'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
               </button>
             </div>
 
-            {/* Stories Table */}
-            <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-100 font-bold uppercase tracking-wider">
-                    <tr>
-                      <th className="p-4">Bài Viết</th>
-                      <th className="p-4">Tỉnh Thành / Vùng</th>
-                      <th className="p-4">Chủ Đề</th>
-                      <th className="p-4">Lượt Xem / Tim</th>
-                      <th className="p-4">Trạng Thái</th>
-                      <th className="p-4 text-right">Thao Tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {stories
-                      .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()) || s.province.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map(story => (
-                        <tr key={story.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <img src={story.coverImage} alt={story.title} className="w-12 h-12 rounded-xl object-cover" />
-                              <div className="max-w-xs">
-                                <h4 className="font-bold text-slate-800 truncate">{story.title}</h4>
-                                <p className="text-[11px] text-slate-400 truncate">Nguồn: {story.sourceName}</p>
+            {/* Sidebar Content Panel */}
+            <div className={`bg-white/95 backdrop-blur-xl border border-sky-100/90 rounded-3xl p-4 sm:p-5 shadow-lg shadow-sky-500/5 space-y-5 ${mobileMenuOpen ? 'block' : 'hidden lg:block'}`}>
+              
+              {/* Sidebar Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-sky-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-200/80 shadow-2xs">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Menu Quản Trị
+                  </span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-extrabold">
+                  9 Phân hệ
+                </span>
+              </div>
+
+              {/* Vertical Menu Groups */}
+              <nav className="space-y-4">
+                {menuCategories.map((cat, catIdx) => (
+                  <div key={catIdx} className="space-y-1.5">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3 py-1">
+                      {cat.title}
+                    </div>
+
+                    <div className="space-y-1">
+                      {cat.items.map((item) => {
+                        const isActive = activeTab === item.id;
+                        const Icon = item.icon;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setActiveTab(item.id);
+                              setMobileMenuOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-150 text-left group cursor-pointer ${
+                              isActive
+                                ? 'bg-gradient-to-r from-sky-500 via-blue-600 to-cyan-600 text-white shadow-md shadow-sky-500/20'
+                                : 'text-slate-600 hover:text-sky-700 hover:bg-sky-50/80'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
+                                isActive
+                                  ? 'bg-white/20 text-white shadow-xs'
+                                  : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700'
+                              }`}>
+                                <Icon className="w-3.5 h-3.5" />
                               </div>
+                              <span className={`truncate text-xs ${isActive ? 'text-white font-black' : 'font-semibold group-hover:text-sky-800'}`}>
+                                {item.label}
+                              </span>
                             </div>
-                          </td>
-                          <td className="p-4">
-                            <span className="font-semibold text-slate-700">{story.province}</span>
-                            <span className="text-[10px] text-slate-400 block">{story.region === 'Bắc' ? 'Miền Bắc' : story.region === 'Trung' ? 'Miền Trung' : 'Miền Nam'}</span>
-                          </td>
-                          <td className="p-4">
-                            <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-bold text-[10px]">
-                              {story.category}
-                            </span>
-                          </td>
-                          <td className="p-4 text-slate-600">
-                            <span>👁️ {story.views || 0}</span> • <span className="text-rose-600">❤️ {story.likes || 0}</span>
-                          </td>
-                          <td className="p-4">
-                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-100 text-emerald-700">
-                              {story.status}
-                            </span>
-                          </td>
-                          <td className="p-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => handleOpenEditStoryModal(story)}
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-sky-100 text-slate-600 hover:text-sky-600 transition-colors"
-                                title="Chỉnh sửa"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              {onDeleteStory && (
-                                <button
-                                  onClick={() => {
-                                    if (window.confirm('Bạn có chắc muốn xóa bài viết này?')) {
-                                      onDeleteStory(story.id);
-                                      showToast('Đã xóa bài viết', { type: 'info' });
-                                    }
-                                  }}
-                                  className="p-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-600 transition-colors"
-                                  title="Xóa"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                              {item.badge}
+                              {isActive && (
+                                <ChevronRight className="w-3.5 h-3.5 text-white animate-pulse" />
                               )}
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: STORY SUBMISSIONS REVIEW (KỂ LUMI NGHE) */}
-        {activeTab === 'submissions' && (
-          <div className="space-y-6">
-            <h3 className="font-display font-bold text-lg text-slate-900">
-              Duyệt Bài Gửi Tử Tế Từ Học Sinh ({submissions.length} bài)
-            </h3>
-
-            {submissions.length === 0 ? (
-              <div className="py-12 text-center bg-white rounded-3xl border border-slate-100 text-slate-400 text-xs">
-                Chưa có bài gửi nào từ học sinh.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {submissions.map(sub => (
-                  <div key={sub.id} className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                          sub.status === 'approved' || sub.status === 'converted_to_story' ? 'bg-emerald-100 text-emerald-800' : sub.status === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {sub.status === 'converted_to_story' ? 'Đã duyệt & Xuất bản' : sub.status === 'rejected' ? 'Đã từ chối' : 'Chờ kiểm duyệt'}
-                        </span>
-                        <span className="text-xs font-semibold text-sky-700">📍 {sub.province}</span>
-                        <span className="text-xs text-slate-400">• {sub.submittedAt}</span>
-                      </div>
-
-                      <div className="text-xs text-slate-600">
-                        Người gửi: <strong>{sub.authorName}</strong> {sub.sourceName && `(Nguồn: ${sub.sourceName})`}
-                      </div>
-                    </div>
-
-                    <h4 className="text-base font-bold text-slate-900">{sub.title}</h4>
-                    <p className="text-xs text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                      {sub.content}
-                    </p>
-
-                    {sub.message && (
-                      <p className="text-xs text-rose-700 font-medium">
-                        💌 <strong>Thông điệp muốn gửi gắm:</strong> {sub.message}
-                      </p>
-                    )}
-
-                    {sub.imageUrl && (
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <ImageIcon className="w-4 h-4 text-slate-400" />
-                        <a href={sub.imageUrl} target="_blank" rel="noreferrer" className="text-sky-600 underline truncate max-w-xs">
-                          {sub.imageUrl}
-                        </a>
-                      </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-                      {sub.status === 'pending' && (
-                        <>
-                          {onConvertSubmission && (
-                            <button
-                              onClick={() => {
-                                onConvertSubmission(sub.id);
-                                showToast('Đã chuyển bài gửi thành bài viết chính thức!', { type: 'success' });
-                              }}
-                              className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Duyệt & Chuyển Thành Bài Viết Mới</span>
-                            </button>
-                          )}
-                          {onRejectSubmission && (
-                            <button
-                              onClick={() => {
-                                const feedback = window.prompt('Nhập lý do từ chối (tùy chọn):', 'Nội dung chưa đủ thông tin xác thực');
-                                onRejectSubmission(sub.id, feedback || undefined);
-                                showToast('Đã từ chối bài gửi', { type: 'info' });
-                              }}
-                              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>Từ Chối</span>
-                            </button>
-                          )}
-                        </>
-                      )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-        )}
+              </nav>
 
-        {/* TAB 4: LOVE LETTERS MODERATION */}
-        {activeTab === 'letters' && (
-          <div className="space-y-6">
-            <h3 className="font-display font-bold text-lg text-slate-900">
-              Kiểm Duyệt Thư Yêu Thương ({letters.length} thư)
-            </h3>
-
-            {letters.length === 0 ? (
-              <div className="py-12 text-center bg-white rounded-3xl border p-6 text-slate-500 text-xs">
-                Chưa có thư nào trong hệ thống.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {letters.map((letter) => (
-                  <div 
-                    key={letter.id} 
-                    className={`p-6 rounded-3xl border bg-white shadow-xs space-y-4 ${
-                      letter.status === 'pending' ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
-                          letter.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : letter.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                        }`}>
-                          {letter.status === 'approved' ? 'Đã duyệt' : letter.status === 'pending' ? 'Đang chờ duyệt' : 'Đã từ chối'}
-                        </span>
-                        <span className="text-xs font-semibold text-rose-600">💌 {letter.category}</span>
-                        <span className="text-xs text-slate-400 font-mono">{letter.createdAt}</span>
-                      </div>
-
-                      <div className="text-xs text-slate-500">
-                        Người gửi: <strong>{letter.isAnonymous ? 'Ẩn danh' : letter.senderName}</strong>
-                        {letter.targetPerson && <span> • Gửi tới: <strong>{letter.targetPerson}</strong></span>}
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-slate-800 italic bg-rose-50/40 p-4 rounded-2xl border border-rose-100 font-handwriting text-lg">
-                      “{letter.content}”
-                    </p>
-
-                    {/* LUMI Reply Input */}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="text"
-                        placeholder="Nhập lời hồi đáp yêu thương từ LUMI..."
-                        defaultValue={letter.replyFromLumi || ''}
-                        onChange={(e) => setReplyInputs(prev => ({ ...prev, [letter.id]: e.target.value }))}
-                        className="flex-1 px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-rose-400 bg-white"
-                      />
-                      <div className="flex items-center gap-2">
-                        {letter.status !== 'approved' && (
-                          <button
-                            onClick={() => onApproveLetter(letter.id, replyInputs[letter.id] || letter.replyFromLumi)}
-                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Duyệt</span>
-                          </button>
-                        )}
-                        {letter.status !== 'rejected' && (
-                          <button
-                            onClick={() => onRejectLetter(letter.id)}
-                            className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                            <span>Từ chối</span>
-                          </button>
-                        )}
-                        <button
-                          onClick={() => onDeleteLetter(letter.id)}
-                          className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 transition-colors"
-                          title="Xóa vĩnh viễn"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+              {/* Sidebar Footer: System Status */}
+              <div className="pt-3 border-t border-sky-100">
+                <div className="bg-gradient-to-br from-sky-50/90 via-blue-50/50 to-slate-50 rounded-2xl p-3.5 border border-sky-200/70 space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Trạng thái máy chủ:</span>
+                    <span className="text-emerald-700 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Trực tuyến
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 5: PHOTOVOICE */}
-        {activeTab === 'photovoice' && (
-          <div className="space-y-6">
-            <h3 className="font-display font-bold text-lg text-slate-900">
-              Kiểm Duyệt Tác Phẩm Photovoice Học Sinh ({photovoiceItems.length})
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {photovoiceItems.map(item => (
-                <div key={item.id} className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs space-y-3">
-                  <div className="flex gap-4">
-                    <img src={item.imageUrl} alt={item.title} className="w-24 h-24 rounded-2xl object-cover" />
-                    <div className="space-y-1 flex-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${item.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                        {item.status === 'approved' ? 'Đã duyệt' : 'Chờ duyệt'}
-                      </span>
-                      <h4 className="text-sm font-bold text-slate-900">{item.title}</h4>
-                      <p className="text-xs text-slate-500">{item.authorName} ({item.authorGrade})</p>
-                    </div>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Đồng bộ:</span>
+                    <span className="text-sky-700 font-bold">Thời gian thực</span>
                   </div>
-
-                  <p className="text-xs text-slate-600 italic bg-slate-50 p-2.5 rounded-xl">
-                    “{item.storyText}”
-                  </p>
-
-                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                    {item.status !== 'approved' && (
-                      <button
-                        onClick={() => onApprovePhotovoice(item.id)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold flex items-center gap-1"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Duyệt</span>
-                      </button>
-                    )}
-                    {item.status !== 'rejected' && (
-                      <button
-                        onClick={() => onRejectPhotovoice(item.id)}
-                        className="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold flex items-center gap-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        <span>Từ chối</span>
-                      </button>
-                    )}
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">Phân quyền:</span>
+                    <span className="text-indigo-700 font-bold">
+                      {isSuperAdmin ? 'Super Admin' : 'Admin'}
+                    </span>
                   </div>
                 </div>
-              ))}
+              </div>
+
             </div>
-          </div>
-        )}
+          </aside>
 
-        {/* TAB 6: SURVEY ANALYTICS & SPSS EXPORT */}
-        {activeTab === 'surveys' && (
-          <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="font-display font-bold text-lg text-slate-900">
-                  Phân Tích Thống Kê & Bảng Đối Sánh Pre-test / Post-test
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Đã thu thập <strong>{surveys.length}</strong> phiếu khảo sát hoàn chỉnh (Pre-test: {preSurveys.length} | Post-test: {postSurveys.length}).
-                </p>
-              </div>
+          {/* RIGHT WORKSPACE: Dynamic Tab Body */}
+          <main className="flex-1 w-full min-w-0">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-sky-500/5 border border-sky-100/90 text-slate-800 transition-all duration-200">
+          
+          {activeTab === 'stories' && (
+            <AdminStoriesTab
+              stories={stories}
+              onAddStory={onAddStory}
+              onUpdateStory={onUpdateStory}
+              onDeleteStory={onDeleteStory}
+              operatorEmail={user.email}
+              onSelectStory={(story) => {
+                if (onNavigate) {
+                  onNavigate('stories');
+                }
+              }}
+            />
+          )}
 
-              <button
-                onClick={handleExportCSV}
-                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Xuất Dữ Liệu SPSS (CSV)</span>
-              </button>
+          {activeTab === 'map' && (
+            <AdminMapTab
+              points={mapPoints}
+              onAddPoint={handleAddMapPoint}
+              onUpdatePoint={handleUpdateMapPoint}
+              onDeletePoint={handleDeleteMapPoint}
+              onNavigateToMap={onNavigate ? () => onNavigate('map') : undefined}
+            />
+          )}
+
+          {activeTab === 'letters' && (
+            <AdminLettersTab
+              letters={letters}
+              onApproveLetter={onApproveLetter}
+              onRejectLetter={onRejectLetter}
+              onDeleteLetter={onDeleteLetter}
+              onAddLetter={(letter) => {
+                storageService.addLetter(letter);
+                showToast('Đã đăng lá thư mới vào Hộp thư', { type: 'success' });
+              }}
+              onUpdateLetter={(id, updates) => {
+                storageService.updateLetter(id, updates);
+                showToast('Đã lưu nội dung lá thư', { type: 'success' });
+              }}
+            />
+          )}
+
+          {activeTab === 'music' && (
+            <AdminMusicTab
+              musicList={musicList}
+              onAddMusic={handleAddMusic}
+              onUpdateMusic={handleUpdateMusic}
+              onDeleteMusic={handleDeleteMusic}
+              onNavigateToMusic={onNavigate ? () => onNavigate('music') : undefined}
+            />
+          )}
+
+          {activeTab === 'gallery' && (
+            <AdminGalleryTab
+              galleryItems={galleryItems}
+              photovoiceItems={photovoiceItems}
+              onAddGalleryItem={handleAddGalleryItem}
+              onUpdateGalleryItem={handleUpdateGalleryItem}
+              onDeleteGalleryItem={handleDeleteGalleryItem}
+              onApprovePhotovoice={onApprovePhotovoice}
+              onRejectPhotovoice={onRejectPhotovoice}
+              onNavigateToGallery={onNavigate ? () => onNavigate('gallery') : undefined}
+            />
+          )}
+
+          {activeTab === 'research' && (
+            <AdminResearchTab
+              researchItems={researchItems}
+              onAddResearch={handleAddResearch}
+              onUpdateResearch={handleUpdateResearch}
+              onDeleteResearch={handleDeleteResearch}
+              onNavigateToResearch={onNavigate ? () => onNavigate('research') : undefined}
+            />
+          )}
+
+          {activeTab === 'submissions' && (
+            <AdminSubmissionsTab
+              submissions={submissions}
+              onConvertSubmission={(id) => {
+                if (onConvertSubmission) onConvertSubmission(id);
+                showToast('Đã phê duyệt và chuyển thành Câu chuyện tử tế công khai!', { type: 'success' });
+              }}
+              onRejectSubmission={(id, feedback) => {
+                if (onRejectSubmission) onRejectSubmission(id, feedback);
+                showToast('Đã từ chối bài đóng góp', { type: 'info' });
+              }}
+              onDeleteSubmission={(id) => {
+                storageService.deleteSubmission(id);
+                showToast('Đã xóa bài đóng góp', { type: 'info' });
+              }}
+            />
+          )}
+
+          {activeTab === 'settings' && (
+            <AdminSettingsTab
+              settings={siteSettings}
+              onSaveSettings={handleSaveSettings}
+              onResetDatabase={() => {
+                storageService.resetToDefaults();
+                showToast('Đã khôi phục dữ liệu mẫu ban đầu!', { type: 'sparkle' });
+                window.location.reload();
+              }}
+            />
+          )}
+
+          {activeTab === 'audit' && (
+            <AdminAuditTab
+              logs={auditLogs}
+              presences={presences}
+              currentUserEmail={user.email}
+              onRefreshLogs={loadLogs}
+              isLoading={isLoadingLogs}
+            />
+          )}
+
             </div>
-
-            {/* Comparison Metrics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-6 rounded-3xl bg-white border border-rose-100 shadow-xs space-y-4">
-                <span className="text-xs font-bold text-rose-600 uppercase tracking-wider">1. Nhận diện cảm xúc (ND)</span>
-                <div className="flex items-center justify-between pt-2">
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Pre-test</span>
-                    <span className="font-display font-bold text-2xl text-slate-600">{preND}</span>
-                  </div>
-                  <div className="text-rose-500 font-bold">→</div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Post-test</span>
-                    <span className="font-display font-bold text-2xl text-rose-600">{postND}</span>
-                  </div>
-                </div>
-                <div className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl">
-                  ▲ Tăng {(((postND - preND)/preND)*100).toFixed(1)}% (p &lt; 0.001)
-                </div>
-              </div>
-
-              <div className="p-6 rounded-3xl bg-white border border-amber-100 shadow-xs space-y-4">
-                <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">2. Thấu cảm xúc cảm (TX)</span>
-                <div className="flex items-center justify-between pt-2">
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Pre-test</span>
-                    <span className="font-display font-bold text-2xl text-slate-600">{preTX}</span>
-                  </div>
-                  <div className="text-amber-500 font-bold">→</div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Post-test</span>
-                    <span className="font-display font-bold text-2xl text-amber-600">{postTX}</span>
-                  </div>
-                </div>
-                <div className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl">
-                  ▲ Tăng {(((postTX - preTX)/preTX)*100).toFixed(1)}% (p &lt; 0.001)
-                </div>
-              </div>
-
-              <div className="p-6 rounded-3xl bg-white border border-sky-100 shadow-xs space-y-4">
-                <span className="text-xs font-bold text-sky-600 uppercase tracking-wider">3. Trắc ẩn hành động (TA)</span>
-                <div className="flex items-center justify-between pt-2">
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Pre-test</span>
-                    <span className="font-display font-bold text-2xl text-slate-600">{preTA}</span>
-                  </div>
-                  <div className="text-sky-500 font-bold">→</div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Post-test</span>
-                    <span className="font-display font-bold text-2xl text-sky-600">{postTA}</span>
-                  </div>
-                </div>
-                <div className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1 rounded-xl">
-                  ▲ Tăng {(((postTA - preTA)/preTA)*100).toFixed(1)}% (p &lt; 0.001)
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 7: SITE SETTINGS & MAINTENANCE */}
-        {activeTab === 'settings' && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-6">
-            <h3 className="font-display font-bold text-lg text-slate-900">
-              Cấu Hình Toàn Hệ Thống LUMI
-            </h3>
-
-            <form onSubmit={handleSaveSettings} className="space-y-6 max-w-2xl">
-              {/* Maintenance Toggle */}
-              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-bold text-amber-900">Chế Độ Bảo Trì Hệ Thống</h4>
-                  <p className="text-[11px] text-amber-700">Khi bật, chỉ Ban Quản Trị mới có thể truy cập website.</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={siteSettings.isMaintenanceMode}
-                    onChange={(e) => setSiteSettings(prev => ({ ...prev, isMaintenanceMode: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
-                </label>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Tên Dự Án / Website
-                </label>
-                <input
-                  type="text"
-                  value={siteSettings.siteName}
-                  onChange={(e) => setSiteSettings(prev => ({ ...prev, siteName: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Khẩu Hiệu / Slogan
-                </label>
-                <input
-                  type="text"
-                  value={siteSettings.slogan}
-                  onChange={(e) => setSiteSettings(prev => ({ ...prev, slogan: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Email Liên Hệ
-                  </label>
-                  <input
-                    type="email"
-                    value={siteSettings.contactEmail}
-                    onChange={(e) => setSiteSettings(prev => ({ ...prev, contactEmail: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                    Hotline Học Đường
-                  </label>
-                  <input
-                    type="text"
-                    value={siteSettings.contactPhone}
-                    onChange={(e) => setSiteSettings(prev => ({ ...prev, contactPhone: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                  Dòng Thông Báo Đầu Trang
-                </label>
-                <input
-                  type="text"
-                  value={siteSettings.announcementText}
-                  onChange={(e) => setSiteSettings(prev => ({ ...prev, announcementText: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold shadow-md shadow-sky-500/20 cursor-pointer"
-              >
-                Lưu Cấu Hình
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* TAB 8: AUDIT LOGS */}
-        {activeTab === 'logs' && (
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-sm space-y-4">
-            <h3 className="font-display font-bold text-lg text-slate-900">
-              Nhật Ký Thao Tác Hệ Thống (Audit Trail)
-            </h3>
-
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {auditLogs.map(log => (
-                <div key={log.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-800">{log.userName}</span>
-                      <span className="text-[10px] font-bold px-2 py-0.2 rounded bg-purple-100 text-purple-700">{log.userRole}</span>
-                      <span className="text-slate-400 font-mono">• {log.timestamp}</span>
-                    </div>
-                    <p className="text-slate-700 font-medium mt-1">
-                      <strong>Hành động:</strong> {log.action} trên [{log.entityType}] "{log.entityTitle}"
-                    </p>
-                    {log.details && (
-                      <p className="text-slate-500 text-[11px] mt-0.5">{log.details}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+          </main>
+        </div>
 
       </div>
-
-      {/* STORY EDITOR MODAL */}
-      {isStoryModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto">
-          <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
-              <h3 className="font-display font-bold text-lg text-slate-900">
-                {editingStoryId ? 'Chỉnh Sửa Bài Viết' : 'Tạo Bài Viết Tử Tế Mới'}
-              </h3>
-              <button
-                onClick={() => setIsStoryModalOpen(false)}
-                className="p-1 rounded-full text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveStoryForm} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Tiêu đề bài viết *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={storyForm.title}
-                  onChange={(e) => setStoryForm(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="VD: Hai bạn học sinh..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Tỉnh / Thành phố *
-                  </label>
-                  <select
-                    value={storyForm.province}
-                    onChange={(e) => setStoryForm(prev => ({ ...prev, province: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none bg-white"
-                  >
-                    {vietnameseProvinces.map(p => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Chủ đề / Thể loại *
-                  </label>
-                  <select
-                    value={storyForm.category}
-                    onChange={(e) => setStoryForm(prev => ({ ...prev, category: e.target.value as any }))}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none bg-white"
-                  >
-                    <option value="Trung thực">Trung thực</option>
-                    <option value="Dũng cảm">Dũng cảm</option>
-                    <option value="Sẻ chia">Sẻ chia</option>
-                    <option value="Hiếu thảo">Hiếu thảo</option>
-                    <option value="Bảo vệ môi trường">Bảo vệ môi trường</option>
-                    <option value="Tình bạn">Tình bạn</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nội dung chi tiết *
-                </label>
-                <textarea
-                  required
-                  rows={5}
-                  value={storyForm.content}
-                  onChange={(e) => setStoryForm(prev => ({ ...prev, content: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Thông điệp LUMI gửi gắm
-                </label>
-                <input
-                  type="text"
-                  value={storyForm.message}
-                  onChange={(e) => setStoryForm(prev => ({ ...prev, message: e.target.value }))}
-                  placeholder="Mỗi hành động tử tế..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Ảnh bìa (URL)
-                </label>
-                <input
-                  type="url"
-                  value={storyForm.coverImage}
-                  onChange={(e) => setStoryForm(prev => ({ ...prev, coverImage: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsStoryModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold cursor-pointer shadow-md shadow-sky-500/20"
-                >
-                  Lưu Bài Viết
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
