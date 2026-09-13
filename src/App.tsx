@@ -1,122 +1,462 @@
-import { useState, useEffect } from 'react';
-import Hero from './components/Hero';
-import Problem from './components/Problem';
-import Journey from './components/Journey';
-import Solutions from './components/Solutions';
-import EmpathyHub from './components/EmpathyHub';
-import VideoSection from './components/VideoSection';
-import ImpactMap from './components/ImpactMap';
-import MessageWall from './components/MessageWall';
-import CTA from './components/CTA';
-import Footer from './components/Footer';
-import { Sparkles, Heart } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { ToastProvider } from './context/ToastContext';
+import React, { useState, useEffect } from 'react';
+import { Navbar } from './components/Navbar';
+import { Footer } from './components/Footer';
+import { SearchModal } from './components/SearchModal';
+import { StoryDetailModal } from './components/StoryDetailModal';
+import { SendLetterModal } from './components/SendLetterModal';
+import { LightboxModal } from './components/LightboxModal';
+import { InteractiveCursor } from './components/InteractiveCursor';
+import { AuthModal } from './components/AuthModal';
+import { ProfileDrawer } from './components/ProfileDrawer';
+import { MobileBottomNav } from './components/MobileBottomNav';
 
-export default function App() {
-  const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+// Providers
+import { ToastProvider, useToast } from './context/ToastContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-  // Simulated high-end science media pre-loader
+// Pages
+import { HomeView } from './components/Home/HomeView';
+import { StoriesPage } from './pages/StoriesPage';
+import { MusicPage } from './pages/MusicPage';
+import { LettersPage } from './pages/LettersPage';
+import { GalleryPage } from './pages/GalleryPage';
+import { MapPage } from './pages/MapPage';
+import { ResearchPage } from './pages/ResearchPage';
+import { SubmitStoryPage } from './pages/SubmitStoryPage';
+import { PhotovoicePage } from './pages/PhotovoicePage';
+import { InteractiveComicPage } from './pages/InteractiveComicPage';
+import { SurveyPage } from './pages/SurveyPage';
+import { ExhibitionPage } from './pages/ExhibitionPage';
+import { AdminPage } from './pages/AdminPage';
+
+// Types & Services
+import { 
+  ActiveNavPage, 
+  Story, 
+  Letter, 
+  GalleryMediaItem, 
+  PhotovoiceItem, 
+  SurveySubmission, 
+  StorySubmission,
+  LetterCategory 
+} from './types';
+import { storageService } from './services/storage';
+
+function AppContent() {
+  const [activePage, setActivePage] = useState<ActiveNavPage>('home');
+  const [stories, setStories] = useState<Story[]>([]);
+  const [submissions, setSubmissions] = useState<StorySubmission[]>([]);
+  const [letters, setLetters] = useState<Letter[]>([]);
+  const [galleryItems, setGalleryItems] = useState<GalleryMediaItem[]>([]);
+  const [photovoiceItems, setPhotovoiceItems] = useState<PhotovoiceItem[]>([]);
+  const [surveys, setSurveys] = useState<SurveySubmission[]>([]);
+
+  // Modals state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null);
+  const [isLetterModalOpen, setIsLetterModalOpen] = useState(false);
+  const [selectedLightboxItem, setSelectedLightboxItem] = useState<GalleryMediaItem | null>(null);
+
+  // Audio background state
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  // Toast
+  const { showToast } = useToast();
+
+  // Load all initial data from storageService
   useEffect(() => {
-    let progressTimer: NodeJS.Timeout;
-    if (loading) {
-      progressTimer = setInterval(() => {
-        setLoadingProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(progressTimer);
-            setTimeout(() => {
-              setLoading(false);
-            }, 600); // fade out duration offset
-            return 100;
-          }
-          return prev + Math.floor(Math.random() * 15) + 5;
-        });
-      }, 80);
-    }
-    return () => clearInterval(progressTimer);
-  }, [loading]);
+    setStories(storageService.getStories());
+    setSubmissions(storageService.getSubmissions());
+    setLetters(storageService.getLetters());
+    setGalleryItems(storageService.getGalleryItems());
+    setPhotovoiceItems(storageService.getPhotovoiceItems());
+    setSurveys(storageService.getSurveyResponses());
+  }, []);
 
-  const handleScrollToSection = (sectionId: string) => {
-    const el = document.getElementById(sectionId);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
+  // Web Audio Gentle Ambient Sound Generator for meditation & reading
+  useEffect(() => {
+    let audioCtx: AudioContext | null = null;
+    let oscillator: OscillatorNode | null = null;
+    let gainNode: GainNode | null = null;
+
+    if (isPlayingAudio) {
+      try {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+          oscillator = audioCtx.createOscillator();
+          gainNode = audioCtx.createGain();
+
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(432, audioCtx.currentTime); // 432 Hz Healing frequency
+          gainNode.gain.setValueAtTime(0.015, audioCtx.currentTime);
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          oscillator.start();
+          showToast('Đang phát giai điệu thư giãn 432Hz', { type: 'sparkle' });
+        }
+      } catch {
+        // Silent catch for autoplay restriction
+      }
+    }
+
+    return () => {
+      if (oscillator) {
+        try {
+          oscillator.stop();
+          oscillator.disconnect();
+        } catch {
+          // ignore
+        }
+      }
+      if (audioCtx) {
+        audioCtx.close().catch(() => {});
+      }
+    };
+  }, [isPlayingAudio, showToast]);
+
+  // Scroll to top on page change
+  const handleNavigate = (page: ActiveNavPage) => {
+    setActivePage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Story Interactions
+  const handleLikeStory = (id: string) => {
+    const updated = storageService.likeStory(id);
+    if (updated) {
+      setStories(storageService.getStories());
+      if (selectedStory?.id === id) {
+        setSelectedStory(updated);
+      }
+      showToast('Đã gửi một cái chạm yêu thương ❤️', { type: 'heart' });
     }
   };
 
+  const handleSelectStory = (story: Story) => {
+    storageService.viewStory(story.id);
+    setSelectedStory(story);
+  };
+
+  const handleAddStory = (newStory: Story) => {
+    const updated = storageService.addStory(newStory);
+    setStories(updated);
+  };
+
+  const handleUpdateStory = (id: string, updates: Partial<Story>) => {
+    const updated = storageService.updateStory(id, updates);
+    setStories(updated);
+  };
+
+  const handleDeleteStory = (id: string) => {
+    const updated = storageService.deleteStory(id);
+    setStories(updated);
+  };
+
+  // Story Submissions (Kể LUMI Nghe)
+  const handleSubmitSubmission = (sub: Omit<StorySubmission, 'id' | 'submittedAt' | 'status'>) => {
+    storageService.addSubmission(sub);
+    setSubmissions(storageService.getSubmissions());
+  };
+
+  const handleConvertSubmission = (submissionId: string) => {
+    const { submissions: updatedSubs } = storageService.approveSubmissionAndConvertToStory(submissionId);
+    setSubmissions(updatedSubs);
+    setStories(storageService.getStories());
+  };
+
+  const handleRejectSubmission = (submissionId: string, feedback?: string) => {
+    const updatedSubs = storageService.rejectSubmission(submissionId, feedback);
+    setSubmissions(updatedSubs);
+  };
+
+  // Letter Interactions
+  const handleAddLetter = (letterData: {
+    senderName: string;
+    isAnonymous: boolean;
+    category: LetterCategory;
+    content: string;
+    targetPerson?: string;
+    colorTheme?: 'rose' | 'amber' | 'sky' | 'emerald' | 'purple';
+  }) => {
+    storageService.addLetter(letterData);
+    setLetters(storageService.getLetters());
+    showToast('Lá thư của bạn đã được gửi thành công!', { 
+      description: 'LUMI sẽ chuyển lời yêu thương của bạn vào Hộp thư nhé',
+      type: 'heart' 
+    });
+  };
+
+  const handleLikeLetter = (id: string) => {
+    const updated = storageService.likeLetter(id);
+    if (updated) {
+      setLetters(storageService.getLetters());
+      showToast('Đã thả tim cho lá thư này ❤️', { type: 'heart' });
+    }
+  };
+
+  const handleApproveLetter = (id: string, reply?: string) => {
+    const updated = storageService.approveLetter(id, reply);
+    setLetters(updated);
+    showToast('Đã duyệt xuất bản thư yêu thương', { type: 'success' });
+  };
+
+  const handleRejectLetter = (id: string) => {
+    const updated = storageService.rejectLetter(id);
+    setLetters(updated);
+    showToast('Đã từ chối lá thư', { type: 'info' });
+  };
+
+  const handleDeleteLetter = (id: string) => {
+    const updated = storageService.deleteLetter(id);
+    setLetters(updated);
+    showToast('Đã xóa lá thư vĩnh viễn', { type: 'info' });
+  };
+
+  // Photovoice Interactions
+  const handleAddPhotovoice = (item: {
+    title: string;
+    studentName: string;
+    grade: string;
+    imageUrl: string;
+    story: string;
+    reflectionPrompt: string;
+    theme: string;
+  }) => {
+    storageService.addPhotovoiceItem(item);
+    setPhotovoiceItems(storageService.getPhotovoiceItems());
+    showToast('Đã gửi tác phẩm Photovoice thành công!', { type: 'success' });
+  };
+
+  const handleLikePhotovoice = (id: string) => {
+    const updated = storageService.likePhotovoiceItem(id);
+    if (updated) {
+      setPhotovoiceItems(storageService.getPhotovoiceItems());
+    }
+  };
+
+  const handleApprovePhotovoice = (id: string) => {
+    const updated = storageService.approvePhotovoiceItem(id);
+    setPhotovoiceItems(updated);
+    showToast('Đã duyệt tác phẩm Photovoice', { type: 'success' });
+  };
+
+  const handleRejectPhotovoice = (id: string) => {
+    const updated = storageService.rejectPhotovoiceItem(id);
+    setPhotovoiceItems(updated);
+    showToast('Đã từ chối tác phẩm', { type: 'info' });
+  };
+
+  // Gallery Interactions
+  const handleLikeGalleryItem = (id: string) => {
+    const updated = storageService.likeGalleryItem(id);
+    if (updated) {
+      setGalleryItems(storageService.getGalleryItems());
+      if (selectedLightboxItem?.id === id) {
+        setSelectedLightboxItem(updated);
+      }
+    }
+  };
+
+  // Survey submission
+  const handleSubmitSurvey = (submission: {
+    surveyType: 'pre-test' | 'post-test';
+    studentGender: string;
+    studentGrade: string;
+    schoolName: string;
+    answers: Record<string, number>;
+  }) => {
+    storageService.addSurveyResponse(submission);
+    setSurveys(storageService.getSurveyResponses());
+    showToast('Đã lưu kết quả khảo sát thành công!', { 
+      description: 'Dữ liệu đã được mã hóa phục vụ đề tài nghiên cứu khoa học',
+      type: 'sparkle' 
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#faf8f5] text-slate-800 flex flex-col font-sans selection:bg-sky-500 selection:text-white pb-14 lg:pb-0">
+      {/* Interactive Cursor Follower with Magnetic Pull */}
+      <InteractiveCursor />
+      
+      {/* Primary Sticky Navigation Bar */}
+      <Navbar
+        activePage={activePage}
+        onNavigate={handleNavigate}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        isPlayingAudio={isPlayingAudio}
+        onToggleAudio={() => setIsPlayingAudio(!isPlayingAudio)}
+      />
+
+      {/* Main View Router */}
+      <main className="flex-1">
+        {activePage === 'home' && (
+          <HomeView
+            stories={stories}
+            letters={letters}
+            galleryItems={galleryItems}
+            onNavigate={handleNavigate}
+            onSelectStory={handleSelectStory}
+            onLikeStory={handleLikeStory}
+            onOpenLetterModal={() => setIsLetterModalOpen(true)}
+            onLikeLetter={handleLikeLetter}
+            onOpenLightbox={(item) => setSelectedLightboxItem(item)}
+          />
+        )}
+
+        {activePage === 'stories' && (
+          <StoriesPage
+            stories={stories}
+            onSelectStory={handleSelectStory}
+            onLikeStory={handleLikeStory}
+          />
+        )}
+
+        {activePage === 'music' && (
+          <MusicPage />
+        )}
+
+        {activePage === 'letters' && (
+          <LettersPage
+            letters={letters}
+            onOpenLetterModal={() => setIsLetterModalOpen(true)}
+            onLikeLetter={handleLikeLetter}
+          />
+        )}
+
+        {activePage === 'gallery' && (
+          <GalleryPage
+            galleryItems={galleryItems}
+            onOpenLightbox={(item) => setSelectedLightboxItem(item)}
+            onLikeItem={handleLikeGalleryItem}
+          />
+        )}
+
+        {activePage === 'map' && (
+          <MapPage
+            stories={stories}
+            onSelectStory={handleSelectStory}
+          />
+        )}
+
+        {activePage === 'research' && (
+          <ResearchPage
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {activePage === 'submit-story' && (
+          <SubmitStoryPage
+            onSubmitSubmission={handleSubmitSubmission}
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {activePage === 'photovoice' && (
+          <PhotovoicePage
+            photovoiceItems={photovoiceItems}
+            onSubmitPhotovoice={handleAddPhotovoice}
+            onLikeItem={handleLikePhotovoice}
+          />
+        )}
+
+        {activePage === 'comic' && (
+          <InteractiveComicPage />
+        )}
+
+        {activePage === 'survey' && (
+          <SurveyPage
+            onSubmitSurvey={handleSubmitSurvey}
+          />
+        )}
+
+        {activePage === 'exhibition' && (
+          <ExhibitionPage
+            onNavigate={handleNavigate}
+            onSelectStory={handleSelectStory}
+            onOpenLightbox={(item) => setSelectedLightboxItem(item)}
+          />
+        )}
+
+        {activePage === 'admin' && (
+          <AdminPage
+            letters={letters}
+            photovoiceItems={photovoiceItems}
+            stories={stories}
+            surveys={surveys}
+            submissions={submissions}
+            onApproveLetter={handleApproveLetter}
+            onRejectLetter={handleRejectLetter}
+            onDeleteLetter={handleDeleteLetter}
+            onApprovePhotovoice={handleApprovePhotovoice}
+            onRejectPhotovoice={handleRejectPhotovoice}
+            onAddStory={handleAddStory}
+            onUpdateStory={handleUpdateStory}
+            onDeleteStory={handleDeleteStory}
+            onConvertSubmission={handleConvertSubmission}
+            onRejectSubmission={handleRejectSubmission}
+          />
+        )}
+      </main>
+
+      {/* Global Modals & Drawers */}
+      <SearchModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        stories={stories}
+        onSelectStory={handleSelectStory}
+        onNavigate={handleNavigate}
+      />
+
+      <StoryDetailModal
+        story={selectedStory}
+        onClose={() => setSelectedStory(null)}
+        onLikeStory={handleLikeStory}
+        onSelectStory={handleSelectStory}
+        allStories={stories}
+      />
+
+      <SendLetterModal
+        isOpen={isLetterModalOpen}
+        onClose={() => setIsLetterModalOpen(false)}
+        onSubmit={handleAddLetter}
+      />
+
+      <LightboxModal
+        item={selectedLightboxItem}
+        onClose={() => setSelectedLightboxItem(null)}
+        onLikeItem={handleLikeGalleryItem}
+      />
+
+      <AuthModal />
+
+      <ProfileDrawer
+        stories={stories}
+        letters={letters}
+        submissions={submissions}
+        onSelectStory={handleSelectStory}
+        onNavigate={handleNavigate}
+      />
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav
+        activePage={activePage}
+        onNavigate={handleNavigate}
+      />
+
+      {/* Primary Brand Footer */}
+      <Footer onNavigate={handleNavigate} />
+    </div>
+  );
+}
+
+export default function App() {
   return (
     <ToastProvider>
-      <div className="min-h-screen bg-[#f0f9ff] text-slate-800 overflow-x-hidden selection:bg-sky-500/30 selection:text-slate-900">
-      {/* Immersive loading screen overlay */}
-      <AnimatePresence>
-        {loading && (
-          <motion.div
-            id="global-preloader"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: 'easeInOut' }}
-            className="fixed inset-0 bg-gradient-to-tr from-sky-50 via-white to-amber-50 z-50 flex flex-col justify-center items-center px-4"
-          >
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#0284c705_1px,transparent_1px),linear-gradient(to_bottom,#0284c705_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-sky-300/20 blur-[100px] pointer-events-none animate-pulse" />
-
-            <div className="flex flex-col items-center max-w-sm w-full relative z-10">
-              {/* Brand symbol spinner */}
-              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-400 to-amber-400 flex items-center justify-center font-bold text-2xl text-white shadow-[0_8px_30px_rgba(14,165,233,0.2)] mb-6 animate-[pulse_1.5s_infinite]">
-                LM
-                <div className="absolute inset-0 rounded-2xl border border-white/30 animate-ping pointer-events-none" />
-              </div>
-
-              <span className="text-[10px] font-mono text-sky-500 uppercase tracking-[0.3em] mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-sky-500 animate-spin" /> PROJECT CHẠM • THPT NGUYỄN DU
-              </span>
-              <h1 className="text-lg font-bold text-slate-800 mb-2 tracking-wide font-sans text-center">Đang tải trải nghiệm thấu cảm...</h1>
-              <p className="text-[10px] font-bold text-rose-500 tracking-[0.1em] uppercase mb-8 text-center font-sans max-w-xs leading-relaxed">
-                NHÌN BẰNG TRÁI TIM • HÀNH ĐỘNG BẰNG YÊU THƯƠNG
-              </p>
-
-              {/* Progress indicator */}
-              <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mb-3 relative border border-slate-200/50">
-                <div 
-                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-sky-400 via-indigo-400 to-amber-400 rounded-full transition-all duration-100"
-                  style={{ width: `${loadingProgress}%` }}
-                />
-              </div>
-
-              <div className="flex justify-between w-full text-[10px] font-mono text-slate-400">
-                <span>PROGRESS</span>
-                <span className="text-sky-500 font-bold">{Math.min(100, loadingProgress)}%</span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Campaign Layout (Visible after pre-loader clears) */}
-      {!loading && (
-        <motion.main
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          className="relative z-10"
-        >
-          {/* Main sections assemble */}
-          <Hero 
-            onExploreClick={() => handleScrollToSection('problem-section')}
-            onWatchVideoClick={() => handleScrollToSection('video-section')}
-          />
-          <Problem />
-          <Journey />
-          <Solutions />
-          <EmpathyHub />
-          <VideoSection />
-          <ImpactMap />
-          <MessageWall />
-          <CTA />
-          <Footer />
-        </motion.main>
-      )}
-    </div>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </ToastProvider>
   );
 }

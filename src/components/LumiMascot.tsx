@@ -1,302 +1,235 @@
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
+import { Heart, Sparkles, BookOpen, Star, Bell, Smile, AlertCircle } from 'lucide-react';
+
+export type LumiState = 
+  | 'default'
+  | 'heart'
+  | 'star'
+  | 'reading'
+  | 'waving'
+  | 'joy'
+  | 'thanks'
+  | 'send-love'
+  | 'notification'
+  | 'loading'
+  | 'empty-search'
+  | 'empty-bookmark'
+  | '404';
 
 interface LumiMascotProps {
+  state?: LumiState;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  interactive?: boolean;
+  message?: string;
   className?: string;
-  size?: number;
-  animateHeart?: boolean;
-  animateSway?: boolean;
 }
 
-export default function LumiMascot({
-  className = '',
-  size = 200,
-  animateHeart = true,
-  animateSway = true,
-}: LumiMascotProps) {
+export const LumiMascot: React.FC<LumiMascotProps> = ({ 
+  state = 'default',
+  size = 'md', 
+  interactive = true,
+  message,
+  className = ''
+}) => {
+  const [currentMood, setCurrentMood] = useState<LumiState>(state);
+  const [showBubble, setShowBubble] = useState(false);
+
+  // Sync state if prop changes
+  React.useEffect(() => {
+    setCurrentMood(state);
+  }, [state]);
+
+  const sizeDimensions = {
+    xs: { px: 40, classes: 'w-10 h-10' },
+    sm: { px: 64, classes: 'w-16 h-16' },
+    md: { px: 96, classes: 'w-24 h-24 sm:w-28 sm:h-28' },
+    lg: { px: 144, classes: 'w-36 h-36 sm:w-40 sm:h-40' },
+    xl: { px: 200, classes: 'w-48 h-48 sm:w-56 sm:h-56' }
+  };
+
+  const getBubbleMessage = () => {
+    if (message) return message;
+    switch (currentMood) {
+      case 'heart':
+      case 'send-love':
+        return 'Yêu thương luôn bên bạn!';
+      case 'star':
+      case 'joy':
+        return 'Cùng LUMI tỏa sáng nhé!';
+      case 'reading':
+        return 'Học hỏi mỗi ngày với lòng trắc ẩn!';
+      case 'waving':
+      case 'default':
+        return 'Chào bạn thân mến!';
+      case 'thanks':
+        return 'LUMI cảm ơn bạn rất nhiều!';
+      case 'notification':
+        return 'LUMI có điều mới muốn kể bạn nghe!';
+      case 'loading':
+        return 'LUMI đang chuẩn bị điều bất ngờ...';
+      case 'empty-search':
+        return 'LUMI chưa tìm thấy câu chuyện này!';
+      case 'empty-bookmark':
+        return 'Bạn chưa lưu câu chuyện nào!';
+      case '404':
+        return 'LUMI hình như đi lạc rồi!';
+      default:
+        return 'Nhìn bằng trái tim – Hành động bằng yêu thương!';
+    }
+  };
+
+  const handleClick = () => {
+    if (!interactive) return;
+    const moods: LumiState[] = ['joy', 'heart', 'star', 'waving', 'thanks'];
+    const next = moods[(moods.indexOf(currentMood) + 1) % moods.length];
+    setCurrentMood(next);
+    setShowBubble(true);
+    setTimeout(() => setShowBubble(false), 3500);
+  };
+
   return (
-    <div className={`relative flex flex-col items-center justify-center ${className}`} style={{ width: size, height: size }}>
-      <motion.svg
-        viewBox="0 0 400 400"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-        animate={animateSway ? {
-          y: [0, -6, 0],
-          rotate: [0, 1.5, -1.5, 0],
-        } : {}}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
+    <div className={`relative inline-flex flex-col items-center select-none ${className}`}>
+      {/* Speech Bubble */}
+      {(showBubble || message || ['empty-search', 'empty-bookmark', '404', 'loading'].includes(currentMood)) && (
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-2xl shadow-xl shadow-sky-500/10 border border-sky-100 text-xs font-semibold text-slate-700 whitespace-nowrap z-30 animate-in fade-in zoom-in-95 duration-200 flex items-center gap-1.5">
+          {['heart', 'send-love', 'empty-bookmark'].includes(currentMood) ? (
+            <Heart className="w-3.5 h-3.5 fill-rose-500 text-rose-500 animate-pulse" />
+          ) : ['star', 'joy'].includes(currentMood) ? (
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          ) : currentMood === 'reading' || currentMood === 'empty-search' ? (
+            <BookOpen className="w-3.5 h-3.5 text-sky-500" />
+          ) : currentMood === '404' ? (
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+          ) : (
+            <Smile className="w-3.5 h-3.5 text-sky-500" />
+          )}
+          <span>{getBubbleMessage()}</span>
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-r border-b border-sky-100 rotate-45"></div>
+        </div>
+      )}
+
+      {/* Mascot SVG Body */}
+      <div 
+        onClick={handleClick}
+        className={`${sizeDimensions[size].classes} relative flex items-center justify-center cursor-pointer transform hover:scale-105 active:scale-95 transition-all duration-300`}
+        title="Linh vật LUMI – Lan tỏa lòng trắc ẩn"
       >
-        {/* Shadow under Lumi */}
-        <ellipse cx="200" cy="370" rx="90" ry="12" fill="rgba(14, 165, 233, 0.12)" />
+        {/* Ambient Glow */}
+        <div className="absolute inset-2 bg-sky-300/40 rounded-full blur-xl animate-pulse"></div>
 
-        <g id="lumi-character">
-          {/* Main Body - Teardrop/Droplet Shape */}
-          <path
-            d="M200 45 C110 160, 90 240, 90 290 C90 350, 140 360, 200 360 C260 360, 310 350, 310 290 C310 240, 290 160, 200 45 Z"
-            fill="url(#bodyGradient)"
-            stroke="url(#bodyStrokeGradient)"
-            strokeWidth="4"
+        {/* SVG Mascot Graphic */}
+        <svg 
+          viewBox="0 0 200 200" 
+          className="w-full h-full drop-shadow-md z-10 overflow-visible"
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Headphones Band */}
+          <path 
+            d="M 50 85 C 50 30, 150 30, 150 85" 
+            stroke="#F59E0B" 
+            strokeWidth="10" 
+            strokeLinecap="round" 
           />
+          {/* Headphones Earmuff Left */}
+          <rect x="34" y="65" width="22" height="42" rx="10" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
+          {/* Headphones Earmuff Right */}
+          <rect x="144" y="65" width="22" height="42" rx="10" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
 
-          {/* Highlights on Body */}
-          <path
-            d="M195 65 C145 150, 120 220, 120 280 C120 310, 140 325, 170 325"
-            stroke="white"
-            strokeWidth="6"
-            strokeLinecap="round"
-            opacity="0.35"
-          />
-          <circle cx="160" cy="110" r="14" fill="white" opacity="0.25" filter="blur(2px)" />
+          {/* Main Body Shape - Soft Sky Blue */}
+          <ellipse cx="100" cy="115" rx="68" ry="62" fill="url(#lumiSkyGradient)" stroke="#38BDF8" strokeWidth="3" />
 
-          {/* Orange Headphones */}
-          <g id="headphones">
-            {/* Headband */}
-            <path
-              d="M120 220 C120 120, 280 120, 280 220"
-              stroke="url(#headphonesBandGradient)"
-              strokeWidth="16"
-              strokeLinecap="round"
-              fill="none"
-            />
-            {/* Headband inner cushions */}
-            <path
-              d="M128 215 C128 130, 272 130, 272 215"
-              stroke="url(#headphonesBandAccent)"
-              strokeWidth="6"
-              strokeLinecap="round"
-              fill="none"
-            />
+          {/* Glowing Belly Highlight */}
+          <ellipse cx="100" cy="130" rx="42" ry="32" fill="#FFFFFF" fillOpacity="0.4" />
 
-            {/* Left Ear Cup */}
-            <motion.g
-              whileHover={{ scale: 1.05 }}
-              className="origin-[105px_225px]"
-            >
-              {/* Outer orange cup */}
-              <rect x="75" y="195" width="40" height="70" rx="20" fill="url(#orangeGradient)" stroke="#ea580c" strokeWidth="3" />
-              {/* Inner cushion */}
-              <rect x="95" y="205" width="16" height="50" rx="8" fill="#fbbf24" />
-              {/* Connection jack */}
-              <circle cx="95" cy="230" r="6" fill="#f97316" />
-            </motion.g>
+          {/* Cheeks - Rosy Pink */}
+          <ellipse cx="64" cy="120" rx="9" ry="5.5" fill="#FDA4AF" fillOpacity="0.85" />
+          <ellipse cx="136" cy="120" rx="9" ry="5.5" fill="#FDA4AF" fillOpacity="0.85" />
 
-            {/* Right Ear Cup */}
-            <motion.g
-              whileHover={{ scale: 1.05 }}
-              className="origin-[295px_225px]"
-            >
-              {/* Outer orange cup */}
-              <rect x="285" y="195" width="40" height="70" rx="20" fill="url(#orangeGradient)" stroke="#ea580c" strokeWidth="3" />
-              {/* Inner cushion */}
-              <rect x="289" y="205" width="16" height="50" rx="8" fill="#fbbf24" />
-              {/* Connection jack */}
-              <circle cx="305" cy="230" r="6" fill="#f97316" />
-            </motion.g>
-
-            {/* Glowing signal waves from headphones */}
-            <motion.path
-              d="M55 210 A 40 40 0 0 0 55 250"
-              stroke="#0ea5e9"
-              strokeWidth="4"
-              strokeLinecap="round"
-              animate={{ opacity: [0.3, 1, 0.3], scale: [0.95, 1.05, 0.95] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-            <motion.path
-              d="M40 200 A 60 60 0 0 0 40 260"
-              stroke="#f97316"
-              strokeWidth="3"
-              strokeLinecap="round"
-              animate={{ opacity: [0.1, 0.8, 0.1], scale: [0.95, 1.05, 0.95] }}
-              transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-            />
-
-            <motion.path
-              d="M345 210 A 40 40 0 0 1 345 250"
-              stroke="#0ea5e9"
-              strokeWidth="4"
-              strokeLinecap="round"
-              animate={{ opacity: [0.3, 1, 0.3], scale: [0.95, 1.05, 0.95] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-            <motion.path
-              d="M360 200 A 60 60 0 0 1 360 260"
-              stroke="#f97316"
-              strokeWidth="3"
-              strokeLinecap="round"
-              animate={{ opacity: [0.1, 0.8, 0.1], scale: [0.95, 1.05, 0.95] }}
-              transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-            />
-          </g>
-
-          {/* Eyes (Cute big anime-style sparkling eyes) */}
-          <g id="eyes">
-            {/* Left Eye */}
-            <g>
-              <ellipse cx="165" cy="215" rx="18" ry="24" fill="#0f172a" />
-              {/* Blue iris highlight */}
-              <ellipse cx="165" cy="217" rx="14" ry="18" fill="#0284c7" />
-              {/* Large highlight */}
-              <circle cx="159" cy="204" r="8" fill="white" />
-              {/* Secondary highlight */}
-              <circle cx="171" cy="224" r="4" fill="white" />
-              {/* Eyelash details */}
-              <path d="M145 205 C150 195, 175 195, 183 205" stroke="#0f172a" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+          {/* Eyes State Switch */}
+          {['heart', 'send-love', 'empty-bookmark'].includes(currentMood) ? (
+            <g className="animate-pulse">
+              <path d="M 75 100 A 4 4 0 0 0 67 100 Q 71 108 75 112 Q 79 108 83 100 A 4 4 0 0 0 75 100" fill="#E11D48" />
+              <path d="M 125 100 A 4 4 0 0 0 117 100 Q 121 108 125 112 Q 129 108 133 100 A 4 4 0 0 0 125 100" fill="#E11D48" />
             </g>
-
-            {/* Right Eye */}
+          ) : currentMood === 'joy' || currentMood === 'thanks' ? (
             <g>
-              <ellipse cx="235" cy="215" rx="18" ry="24" fill="#0f172a" />
-              {/* Blue iris highlight */}
-              <ellipse cx="235" cy="217" rx="14" ry="18" fill="#0284c7" />
-              {/* Large highlight */}
-              <circle cx="229" cy="204" r="8" fill="white" />
-              {/* Secondary highlight */}
-              <circle cx="241" cy="224" r="4" fill="white" />
-              {/* Eyelash details */}
-              <path d="M217 205 C225 195, 250 195, 255 205" stroke="#0f172a" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              {/* Happy Arched Eyes ^^ */}
+              <path d="M 62 102 Q 72 90 82 102" stroke="#0F172A" strokeWidth="4.5" strokeLinecap="round" />
+              <path d="M 118 102 Q 128 90 138 102" stroke="#0F172A" strokeWidth="4.5" strokeLinecap="round" />
             </g>
+          ) : (
+            <g>
+              {/* Big Expressive Anime Eyes */}
+              <ellipse cx="72" cy="100" rx="7.5" ry="11" fill="#0F172A" />
+              <circle cx="70" cy="96" r="3.5" fill="#FFFFFF" />
+              <circle cx="75" cy="104" r="1.5" fill="#FFFFFF" />
+
+              <ellipse cx="128" cy="100" rx="7.5" ry="11" fill="#0F172A" />
+              <circle cx="126" cy="96" r="3.5" fill="#FFFFFF" />
+              <circle cx="131" cy="104" r="1.5" fill="#FFFFFF" />
+            </g>
+          )}
+
+          {/* Sweet Smile */}
+          <path d="M 92 118 Q 100 128 108 118" stroke="#0F172A" strokeWidth="3.5" strokeLinecap="round" />
+
+          {/* Held Items State */}
+          {['heart', 'send-love', 'empty-bookmark'].includes(currentMood) && (
+            <g className="animate-bounce" style={{ transformOrigin: 'center' }}>
+              <path 
+                d="M 100 148 C 94 138, 80 138, 80 150 C 80 162, 100 174, 100 174 C 100 174, 120 162, 120 150 C 120 138, 106 138, 100 148 Z" 
+                fill="#F43F5E" 
+                stroke="#BE123C" 
+                strokeWidth="2" 
+              />
+            </g>
+          )}
+
+          {currentMood === 'star' && (
+            <g className="animate-spin" style={{ transformOrigin: '100px 150px' }}>
+              <polygon 
+                points="100,132 105,145 119,145 108,154 112,168 100,159 88,168 92,154 81,145 95,145" 
+                fill="#F59E0B" 
+                stroke="#D97706" 
+                strokeWidth="1.5" 
+              />
+            </g>
+          )}
+
+          {(currentMood === 'reading' || currentMood === 'empty-search') && (
+            <g transform="translate(75, 138)">
+              {/* Open Book */}
+              <rect x="0" y="4" width="24" height="18" rx="2" fill="#3B82F6" />
+              <rect x="26" y="4" width="24" height="18" rx="2" fill="#60A5FA" />
+              <line x1="5" y1="9" x2="19" y2="9" stroke="#EFF6FF" strokeWidth="1.5" />
+              <line x1="5" y1="14" x2="16" y2="14" stroke="#EFF6FF" strokeWidth="1.5" />
+              <line x1="31" y1="9" x2="45" y2="9" stroke="#EFF6FF" strokeWidth="1.5" />
+              <line x1="31" y1="14" x2="42" y2="14" stroke="#EFF6FF" strokeWidth="1.5" />
+            </g>
+          )}
+
+          {currentMood === 'waving' && (
+            <g className="animate-wave" style={{ transformOrigin: '155px 120px' }}>
+              <path d="M 155 120 C 170 110, 180 95, 175 90 C 170 85, 155 105, 150 115" fill="#38BDF8" stroke="#0284C7" strokeWidth="2.5" />
+            </g>
+          )}
+
+          {/* Little Floating Head Sparkle */}
+          <g transform="translate(142, 45)" className="animate-pulse">
+            <path d="M 10 0 L 12 7 L 19 10 L 12 12 L 10 19 L 7 12 L 0 10 L 7 7 Z" fill="#FBBF24" />
           </g>
 
-          {/* Cute Rosy Blushing Cheeks */}
-          <g id="cheeks">
-            <circle cx="138" cy="235" r="12" fill="#ef4444" opacity="0.3" filter="blur(3px)" />
-            <circle cx="262" cy="235" r="12" fill="#ef4444" opacity="0.3" filter="blur(3px)" />
-          </g>
-
-          {/* Little Happy Mouth */}
-          <path
-            d="M188 238 C188 238, 200 252, 212 238"
-            stroke="#0f172a"
-            strokeWidth="4"
-            strokeLinecap="round"
-            fill="none"
-          />
-          {/* Mouth open tongue */}
-          <path
-            d="M192 241 C194 246, 206 246, 208 241 Z"
-            fill="#f87171"
-          />
-
-          {/* Hands holding the Golden-Orange Heart */}
-          <g id="hands-and-heart">
-            {/* The Heart */}
-            <motion.path
-              d="M200 278 C200 278, 170 248, 170 230 C170 216, 183 206, 196 215 C200 218, 200 218, 200 218 C200 218, 200 218, 204 215 C217 206, 230 216, 230 230 C230 248, 200 278, 200 278 Z"
-              fill="url(#heartGradient)"
-              stroke="#ea580c"
-              strokeWidth="3.5"
-              className="origin-[200px_245px]"
-              animate={animateHeart ? {
-                scale: [1, 1.08, 1],
-              } : {}}
-              transition={{
-                duration: 1.8,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            />
-
-            {/* Left Hand hugging the heart */}
-            <path
-              d="M135 285 C150 280, 172 265, 182 258"
-              stroke="url(#bodyGradient)"
-              strokeWidth="14"
-              strokeLinecap="round"
-              fill="none"
-            />
-            <path
-              d="M135 285 C150 280, 172 265, 182 258"
-              stroke="url(#bodyStrokeGradient)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              fill="none"
-              opacity="0.5"
-            />
-
-            {/* Right Hand hugging the heart */}
-            <path
-              d="M265 285 C250 280, 228 265, 218 258"
-              stroke="url(#bodyGradient)"
-              strokeWidth="14"
-              strokeLinecap="round"
-              fill="none"
-            />
-            <path
-              d="M265 285 C250 280, 228 265, 218 258"
-              stroke="url(#bodyStrokeGradient)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              fill="none"
-              opacity="0.5"
-            />
-          </g>
-
-          {/* Little feet/shoes */}
-          <g id="feet">
-            {/* Left Foot */}
-            <path
-              d="M140 345 C130 345, 115 352, 120 365 C125 375, 155 375, 160 365 C162 355, 150 345, 140 345 Z"
-              fill="url(#orangeGradient)"
-              stroke="#d97706"
-              strokeWidth="2.5"
-            />
-            {/* Right Foot */}
-            <path
-              d="M260 345 C270 345, 285 352, 280 365 C275 375, 245 375, 240 365 C238 355, 250 345, 260 345 Z"
-              fill="url(#orangeGradient)"
-              stroke="#d97706"
-              strokeWidth="2.5"
-            />
-          </g>
-        </g>
-
-        {/* Gradients definitions */}
-        <defs>
-          {/* Main body light sky blue gradient */}
-          <linearGradient id="bodyGradient" x1="200" y1="45" x2="200" y2="360" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#e0f2fe" />
-            <stop offset="40%" stopColor="#38bdf8" />
-            <stop offset="100%" stopColor="#0284c7" />
-          </linearGradient>
-
-          {/* Main body stroke */}
-          <linearGradient id="bodyStrokeGradient" x1="200" y1="45" x2="200" y2="360" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#bae6fd" />
-            <stop offset="100%" stopColor="#0369a1" />
-          </linearGradient>
-
-          {/* Headphones earcups orange gradient */}
-          <linearGradient id="orangeGradient" x1="0" y1="195" x2="0" y2="265" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#fbbf24" />
-            <stop offset="50%" stopColor="#f97316" />
-            <stop offset="100%" stopColor="#ea580c" />
-          </linearGradient>
-
-          {/* Headphones band orange-gold */}
-          <linearGradient id="headphonesBandGradient" x1="120" y1="120" x2="280" y2="220" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#fbbf24" />
-            <stop offset="50%" stopColor="#f97316" />
-            <stop offset="100%" stopColor="#f59e0b" />
-          </linearGradient>
-          <linearGradient id="headphonesBandAccent" x1="120" y1="120" x2="280" y2="220" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#fffbeb" />
-            <stop offset="100%" stopColor="#fbbf24" />
-          </linearGradient>
-
-          {/* Heart soft glowing gold-orange-red */}
-          <linearGradient id="heartGradient" x1="200" y1="200" x2="200" y2="280" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#fef08a" />
-            <stop offset="25%" stopColor="#facc15" />
-            <stop offset="70%" stopColor="#f97316" />
-            <stop offset="100%" stopColor="#ef4444" />
-          </linearGradient>
-        </defs>
-      </motion.svg>
+          {/* Gradients */}
+          <defs>
+            <linearGradient id="lumiSkyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#BAE6FD" />
+              <stop offset="60%" stopColor="#7DD3FC" />
+              <stop offset="100%" stopColor="#38BDF8" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
     </div>
   );
-}
+};

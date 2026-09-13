@@ -1,101 +1,209 @@
-import { Facebook, Youtube, Video, Mail, MapPin, Phone, Sparkles } from 'lucide-react';
+import React from 'react';
+import { 
+  Heart, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Sparkles, 
+  Shield, 
+  BookOpen, 
+  Globe, 
+  ExternalLink,
+  GraduationCap
+} from 'lucide-react';
+import { ActiveNavPage } from '../types';
 
-export default function Footer() {
+interface FooterProps {
+  onNavigate: (page: ActiveNavPage) => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer id="footer-section" className="relative bg-[#020617] text-gray-400 font-sans border-t border-white/5 py-16 overflow-hidden">
-      {/* Background glow highlights */}
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-cyan-500/5 blur-[120px] pointer-events-none" />
-
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12">
+    <footer id="main-footer" className="bg-slate-900 text-slate-300 pt-16 pb-12 border-t border-slate-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Top brand grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 pb-12 border-b border-slate-800/80">
           
-          {/* Logo & Slogan Column */}
-          <div className="lg:col-span-5">
-            <div className="flex items-center gap-2 text-white mb-6">
-              <span className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-400 to-purple-500 flex items-center justify-center font-bold text-sm text-black">
-                CH
-              </span>
-              <span className="font-extrabold text-lg tracking-wider">CHẠM</span>
-              <span className="text-[9px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-400/20 px-1.5 py-0.5 rounded tracking-widest uppercase">
-                Campaign
-              </span>
-            </div>
-
-            <p className="text-gray-300 text-sm font-semibold leading-relaxed mb-4 uppercase">
-              Dự án nghiên cứu & Chiến dịch truyền thông học đường:
-            </p>
-            <p className="text-gray-400 text-xs sm:text-sm font-light leading-relaxed mb-3">
-              “Tác động của truyền thông thị giác có định hướng đến sự thay đổi hành vi trắc ẩn của học sinh trung học phổ thông”
-            </p>
-            <p className="text-rose-400 text-xs sm:text-sm font-semibold tracking-wider uppercase mb-6 flex items-center gap-1">
-              <span>Slogan: NHÌN BẰNG TRÁI TIM - HÀNH ĐỘNG BẰNG YÊU THƯƠNG</span>
-            </p>
-
-            <div className="flex gap-4">
-              <a href="#" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors">
-                <Facebook className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors">
-                <Youtube className="w-4 h-4" />
-              </a>
-              <a href="#" className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors">
-                <Video className="w-4 h-4" /> {/* TikTok representation */}
-              </a>
-            </div>
-          </div>
-
-          {/* Contact details Column */}
-          <div className="lg:col-span-4 flex flex-col gap-4">
-            <h4 className="text-white text-xs font-mono uppercase tracking-widest mb-2 border-b border-white/5 pb-2">Liên Hệ Dự Án</h4>
-            
-            <div className="flex gap-3 items-start text-xs sm:text-sm">
-              <MapPin className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
-              <p className="font-light text-gray-400">Trường THPT Nguyễn Du, TP. Hồ Chí Minh</p>
-            </div>
-
-            <div className="flex gap-3 items-start text-xs sm:text-sm">
-              <Mail className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
-              <p className="font-light text-gray-400">cham.nguyendu.project@gmail.com</p>
-            </div>
-
-            <div className="flex gap-3 items-start text-xs sm:text-sm">
-              <Phone className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
-              <p className="font-light text-gray-400">(+84) 902 456 789</p>
-            </div>
-          </div>
-
-          {/* Custom QR Code Column */}
-          <div className="lg:col-span-3 flex flex-col items-start lg:items-end">
-            <h4 className="text-white text-xs font-mono uppercase tracking-widest mb-4 border-b border-white/5 pb-2 w-full lg:text-right">Quét Mã QR</h4>
-            
-            <div className="p-3 bg-white/[0.02] border border-white/10 rounded-2xl flex flex-col items-center gap-2">
-              {/* Custom SVG stylized vector QR code representation */}
-              <div className="w-28 h-28 bg-white p-2 rounded-xl relative flex items-center justify-center">
-                <svg className="w-full h-full text-black" viewBox="0 0 29 29">
-                  <path fill="currentColor" d="M0 0h9v9H0zm2 2v5h5V2zm18-2h9v9h-9zm2 2v5h5V2zM0 20h9v9H0zm2 2v5h5v-5zm22-1v4h-4v-4zm2-2h3v3h-3zm-6-2h3v4h-3zm3 10h4v3h-4zm-7-10h3v3h-3zm2 4h4v3h-4zm-8-3h3v4h-3zm-3 4h4v3h-4zm15-4h3v3h-3zm1-13h1v1h-1zm5 5h1v1h-1zM5 5h1v1H5zm19 19h1v1h-1zm-15 0h1v1H9z" />
-                </svg>
-                {/* Embedded brand symbol inside QR */}
-                <div className="absolute w-6 h-6 rounded bg-[#0b1329] border border-cyan-400 flex items-center justify-center font-bold text-[8px] text-white select-none">
-                  CH
+          {/* Col 1 & 2: Brand & Slogan */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 via-rose-400 to-amber-300 p-0.5 shadow-md flex items-center justify-center">
+                <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-rose-500">
+                  <Heart className="w-5 h-5 fill-rose-500 text-rose-500" />
                 </div>
               </div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Ghé thăm Fanpage</span>
+              <div>
+                <span className="font-display font-extrabold text-xl text-white tracking-tight">
+                  LUMI – CHẠM IU THƯƠNG
+                </span>
+                <p className="text-xs text-rose-400 font-medium">Lan tỏa lòng trắc ẩn</p>
+              </div>
+            </div>
+
+            <p className="text-base text-rose-200/90 font-handwriting text-xl leading-relaxed">
+              “NHÌN BẰNG TRÁI TIM – HÀNH ĐỘNG BẰNG YÊU THƯƠNG”
+            </p>
+
+            <p className="text-xs text-slate-400 leading-relaxed pr-4">
+              Không gian số lan tỏa lòng trắc ẩn và nền tảng can thiệp truyền thông thị giác có định hướng thuộc đề tài nghiên cứu khoa học hành vi học sinh THPT Nguyễn Du.
+            </p>
+
+            {/* Quick Contact Badge */}
+            <div className="pt-2 space-y-2 text-xs text-slate-300">
+              <div className="flex items-center gap-2">
+                <Phone className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>Hotline: <strong className="text-white font-mono">0345824974</strong></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Mail className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>Email: <strong className="text-white font-mono">lumichamiuthuong@gmail.com</strong></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Globe className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>Dự án: <strong className="text-white">Chạm Iu Thương</strong></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Col 3: Khám phá */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-rose-400">
+              Khám Phá
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <button 
+                  onClick={() => onNavigate('stories')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Câu chuyện tử tế
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('map')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Bản đồ lòng trắc ẩn
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('music')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  MV "Điều Chưa Nói"
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('letters')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Hộp thư yêu thương
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('gallery')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Góc hình ảnh & Poster
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Col 4: Trải nghiệm tương tác */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-rose-400">
+              Trải Nghiệm Số
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <button 
+                  onClick={() => onNavigate('photovoice')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Dự án Photovoice
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('comic')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Truyện tranh tương tác
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('survey')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Khảo sát Pre/Post Test
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('exhibition')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Triển lãm ảo 2.5D
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => onNavigate('research')}
+                  className="hover:text-rose-300 transition-colors cursor-pointer"
+                >
+                  Cơ sở khoa học (300 HS)
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Col 5: Nguồn tư liệu & Bảo mật */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-rose-400">
+              Minh Bạch & Nguồn
+            </h4>
+            <div className="text-[11px] text-slate-400 space-y-2 leading-relaxed">
+              <p>
+                Nội dung câu chuyện được tuyển chọn và trích dẫn minh bạch từ các cơ quan báo chí uy tín (Tuổi Trẻ, Dân Trí, Tiền Phong, Thanh Niên) kết hợp câu chuyện học sinh THPT.
+              </p>
+              <div className="flex items-center gap-1 text-slate-300 font-medium pt-1">
+                <Shield className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>Bảo mật 100% dữ liệu học sinh</span>
+              </div>
             </div>
           </div>
 
         </div>
 
-        {/* Lower footer copyright bar */}
-        <div className="border-t border-white/5 pt-8 flex flex-col sm:flex-row justify-between items-center text-xs text-gray-500 font-mono">
-          <p>© {currentYear} Chiến dịch CHẠM • THPT Nguyễn Du. Bảo lưu mọi quyền.</p>
-          <p className="flex items-center gap-1 mt-4 sm:mt-0">
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> Thiết kế & Phát triển cho Dự án Khoa học Hành vi THPT
-          </p>
+        {/* Bottom bar */}
+        <div className="pt-8 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-400 gap-4">
+          <p>© {currentYear} Chiến dịch LUMI – CHẠM IU THƯƠNG • THPT Nguyễn Du. Bảo lưu mọi quyền.</p>
+          
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2 text-center sm:text-right">
+            <Sparkles className="w-3.5 h-3.5 text-rose-400" /> 
+            <span>Dự án Nghiên cứu Khoa học Hành vi & Truyền thông thị giác</span>
+            <span className="text-slate-600">|</span>
+            <a 
+              href="https://www.tiktok.com/@ng.m.huy" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-rose-400 hover:text-rose-300 transition-colors underline decoration-rose-400/30 underline-offset-2 font-medium"
+            >
+              Design by ng.m.huy
+            </a>
+          </div>
         </div>
 
       </div>
     </footer>
   );
-}
+};
