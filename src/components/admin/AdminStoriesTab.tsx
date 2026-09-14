@@ -528,7 +528,7 @@ export const AdminStoriesTab: React.FC<AdminStoriesTabProps> = ({
                       className="w-full px-3 py-2 text-xs bg-slate-50/80 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 cursor-pointer font-medium"
                     >
                       {vietnameseProvinces.map(p => (
-                        <option key={p} value={p}>{p}</option>
+                        <option key={p.id} value={p.name}>{p.name}</option>
                       ))}
                     </select>
                   </div>

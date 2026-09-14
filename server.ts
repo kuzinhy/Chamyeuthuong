@@ -641,7 +641,22 @@ app.put('/api/stories/:id', authenticateAdmin, (req, res) => {
 
   const index = db.stories.findIndex(s => s.id === id);
   if (index === -1) {
-    return res.status(404).json({ error: 'NOT_FOUND', message: 'Không tìm thấy câu chuyện.' });
+    // Upsert to be resilient against stories created offline/locally in previous sessions
+    const newStory = {
+      ...updates,
+      id: id,
+      slug: updates.slug || (updates.title ? updates.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : `story-${Date.now()}`),
+      likes: updates.likes || 0,
+      views: updates.views || 0,
+      publishedAt: updates.publishedAt || new Date().toISOString().split('T')[0],
+      version: updates.version || 1,
+      updatedAt: new Date().toISOString(),
+      createdBy: operatorEmail
+    };
+    db.stories.unshift(newStory);
+    saveDB(db);
+    logAudit(operatorEmail, 'CREATE_DRAFT', 'story', newStory.id, newStory.title);
+    return res.json(newStory);
   }
 
   const currentStory = db.stories[index];
@@ -688,7 +703,7 @@ app.delete('/api/stories/:id', authenticateAdmin, (req, res) => {
 
   const target = db.stories.find(s => s.id === id);
   if (!target) {
-    return res.status(404).json({ error: 'NOT_FOUND' });
+    return res.json({ success: true, deletedId: id, note: 'Already deleted' });
   }
 
   db.stories = db.stories.filter(s => s.id !== id);

@@ -46,6 +46,7 @@ import { storageService } from './services/storage';
 import { apiService } from './services/api';
 
 function AppContent() {
+  const { user } = useAuth();
   const [activePage, setActivePage] = useState<ActiveNavPage>('home');
   const [stories, setStories] = useState<Story[]>([]);
   const [submissions, setSubmissions] = useState<StorySubmission[]>([]);
@@ -155,19 +156,49 @@ function AppContent() {
     setSelectedStory(story);
   };
 
-  const handleAddStory = (newStory: Story) => {
+  const handleAddStory = async (newStory: Story) => {
     const updated = storageService.addStory(newStory);
     setStories(updated);
+    if (user?.email) {
+      try {
+        await apiService.createStory(newStory, user.email);
+        showToast('Đã thêm câu chuyện lên hệ thống thành công!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể tạo bài viết.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã lưu câu chuyện cục bộ thành công!', { type: 'success' });
+    }
   };
 
-  const handleUpdateStory = (id: string, updates: Partial<Story>) => {
+  const handleUpdateStory = async (id: string, updates: Partial<Story>) => {
     const updated = storageService.updateStory(id, updates);
     setStories(updated);
+    if (user?.email) {
+      try {
+        await apiService.updateStory(id, updates, user.email);
+        showToast('Đã cập nhật câu chuyện thành công!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể cập nhật.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã cập nhật câu chuyện cục bộ!', { type: 'success' });
+    }
   };
 
-  const handleDeleteStory = (id: string) => {
+  const handleDeleteStory = async (id: string) => {
     const updated = storageService.deleteStory(id);
     setStories(updated);
+    if (user?.email) {
+      try {
+        await apiService.deleteStory(id, user.email);
+        showToast('Đã xóa câu chuyện thành công!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể xóa.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã xóa câu chuyện cục bộ!', { type: 'success' });
+    }
   };
 
   // Story Submissions (Kể LUMI Nghe)
@@ -176,10 +207,20 @@ function AppContent() {
     setSubmissions(storageService.getSubmissions());
   };
 
-  const handleConvertSubmission = (submissionId: string) => {
+  const handleConvertSubmission = async (submissionId: string) => {
     const { submissions: updatedSubs } = storageService.approveSubmissionAndConvertToStory(submissionId);
     setSubmissions(updatedSubs);
     setStories(storageService.getStories());
+    if (user?.email) {
+      try {
+        await apiService.convertSubmission(submissionId, user.email);
+        showToast('Đã duyệt và chuyển bài viết thành câu chuyện thành công!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể chuyển duyệt.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã duyệt và chuyển bài viết thành câu chuyện cục bộ!', { type: 'success' });
+    }
   };
 
   const handleRejectSubmission = (submissionId: string, feedback?: string) => {
@@ -212,22 +253,49 @@ function AppContent() {
     }
   };
 
-  const handleApproveLetter = (id: string, reply?: string) => {
+  const handleApproveLetter = async (id: string, reply?: string) => {
     const updated = storageService.approveLetter(id, reply);
     setLetters(updated);
-    showToast('Đã duyệt xuất bản thư yêu thương', { type: 'success' });
+    if (user?.email) {
+      try {
+        await apiService.moderateLetter(id, { status: 'approved', replyFromLumi: reply }, user.email);
+        showToast('Đã duyệt xuất bản thư yêu thương lên hệ thống!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể duyệt.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã duyệt xuất bản thư yêu thương cục bộ!', { type: 'success' });
+    }
   };
 
-  const handleRejectLetter = (id: string) => {
+  const handleRejectLetter = async (id: string) => {
     const updated = storageService.rejectLetter(id);
     setLetters(updated);
-    showToast('Đã từ chối lá thư', { type: 'info' });
+    if (user?.email) {
+      try {
+        await apiService.moderateLetter(id, { status: 'rejected' }, user.email);
+        showToast('Đã từ chối lá thư thành công!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể từ chối.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã từ chối lá thư cục bộ!', { type: 'info' });
+    }
   };
 
-  const handleDeleteLetter = (id: string) => {
+  const handleDeleteLetter = async (id: string) => {
     const updated = storageService.deleteLetter(id);
     setLetters(updated);
-    showToast('Đã xóa lá thư vĩnh viễn', { type: 'info' });
+    if (user?.email) {
+      try {
+        await apiService.deleteLetter(id, user.email);
+        showToast('Đã xóa lá thư vĩnh viễn khỏi hệ thống!', { type: 'success' });
+      } catch (err: any) {
+        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể xóa.'}`, { type: 'info' });
+      }
+    } else {
+      showToast('Đã xóa lá thư vĩnh viễn cục bộ!', { type: 'info' });
+    }
   };
 
   // Photovoice Interactions
