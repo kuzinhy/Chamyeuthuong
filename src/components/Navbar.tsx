@@ -20,7 +20,10 @@ import {
   LogOut,
   Volume2,
   VolumeX,
-  Compass
+  Compass,
+  Camera,
+  ClipboardCheck,
+  Palette
 } from 'lucide-react';
 import { ActiveNavPage } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -90,7 +93,17 @@ export const Navbar: React.FC<NavbarProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const isExploreActive = ['letters', 'music', 'gallery', 'research', 'submit-story'].includes(activePage);
+  const isExploreActive = [
+    'letters', 
+    'music', 
+    'gallery', 
+    'research', 
+    'submit-story', 
+    'exhibition', 
+    'comic', 
+    'photovoice', 
+    'survey'
+  ].includes(activePage);
 
   return (
     <header 
@@ -248,6 +261,66 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   </button>
 
+                  <button
+                    onClick={() => handleNavClick('exhibition')}
+                    className={`w-full px-3 py-2 text-left text-xs font-medium rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      activePage === 'exhibition' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Triển lãm ảo 2.5D</div>
+                      <div className="text-[10px] text-slate-400">Không gian nghệ thuật thực tế ảo</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavClick('comic')}
+                    className={`w-full px-3 py-2 text-left text-xs font-medium rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      activePage === 'comic' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Truyện tranh tương tác</div>
+                      <div className="text-[10px] text-slate-400">Trải nghiệm tương tác đa giác quan</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavClick('photovoice')}
+                    className={`w-full px-3 py-2 text-left text-xs font-medium rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      activePage === 'photovoice' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center flex-shrink-0">
+                      <Camera className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Dự án Photovoice</div>
+                      <div className="text-[10px] text-slate-400">Kể chuyện qua ống kính học sinh</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavClick('survey')}
+                    className={`w-full px-3 py-2 text-left text-xs font-medium rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                      activePage === 'survey' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center flex-shrink-0">
+                      <ClipboardCheck className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold">Khảo sát tâm lý</div>
+                      <div className="text-[10px] text-slate-400">Đo lường & phản hồi trắc ẩn học đường</div>
+                    </div>
+                  </button>
+
                   <div className="border-t border-slate-100 pt-1 mt-1">
                     <button
                       onClick={() => handleNavClick('submit-story')}
@@ -329,7 +402,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Notifications Button */}
             {isLoggedIn && (
               <button
-                onClick={openProfileDrawer}
+                onClick={() => openProfileDrawer('notifications')}
                 className="p-1.5 rounded-full text-slate-500 hover:text-sky-600 hover:bg-sky-50 transition-all relative cursor-pointer"
                 title="Thông báo"
                 aria-label="Thông báo"
@@ -369,7 +442,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <button
                       onClick={() => {
-                        openProfileDrawer();
+                        openProfileDrawer('bookmarks');
                         setUserDropdownOpen(false);
                       }}
                       className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 flex items-center gap-2.5 cursor-pointer"
@@ -380,7 +453,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <button
                       onClick={() => {
-                        openProfileDrawer();
+                        openProfileDrawer('bookmarks');
                         setUserDropdownOpen(false);
                       }}
                       className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 flex items-center gap-2.5 cursor-pointer"
@@ -391,13 +464,35 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <button
                       onClick={() => {
-                        openProfileDrawer();
+                        openProfileDrawer('letters');
                         setUserDropdownOpen(false);
                       }}
                       className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 flex items-center gap-2.5 cursor-pointer"
                     >
                       <Heart className="w-3.5 h-3.5 text-rose-500" />
                       <span>Lời nhắn của tôi</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        openProfileDrawer('submissions');
+                        setUserDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Bài viết đã gửi</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        openProfileDrawer('notifications');
+                        setUserDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2 text-left text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <Bell className="w-3.5 h-3.5 text-teal-500" />
+                      <span>Thông báo cá nhân</span>
                     </button>
 
                     {isAdmin && (
@@ -523,6 +618,46 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <GraduationCap className="w-4 h-4 text-indigo-500" />
             <span>Đề tài nghiên cứu</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('exhibition')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold ${
+              activePage === 'exhibition' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            <span>Triển lãm ảo 2.5D</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('comic')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold ${
+              activePage === 'comic' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 text-amber-600" />
+            <span>Truyện tranh tương tác</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('photovoice')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold ${
+              activePage === 'photovoice' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700'
+            }`}
+          >
+            <Camera className="w-4 h-4 text-rose-500" />
+            <span>Dự án Photovoice</span>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('survey')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold ${
+              activePage === 'survey' ? 'bg-sky-50 text-sky-600 font-bold' : 'text-slate-700'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4 text-teal-600" />
+            <span>Khảo sát tâm lý trắc ẩn</span>
           </button>
 
           <button

@@ -13,13 +13,6 @@ export const OpeningMessage: React.FC = () => {
           “Mỗi người chúng ta đều có khả năng khiến thế giới trở nên dịu dàng hơn – đôi khi chỉ bằng một ánh nhìn, một lời hỏi thăm hay một hành động nhỏ.”
         </blockquote>
 
-        <div className="flex items-center justify-center gap-3 pt-2">
-          <div className="h-px w-12 bg-rose-300"></div>
-          <p className="text-xs font-semibold text-rose-600 tracking-wider uppercase">
-            Thông điệp từ Ban Dự án LUMI – THPT Nguyễn Du
-          </p>
-          <div className="h-px w-12 bg-rose-300"></div>
-        </div>
       </div>
     </section>
   );

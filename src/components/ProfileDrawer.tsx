@@ -23,17 +23,17 @@ import { Story, Letter, StorySubmission, ActiveNavPage } from '../types';
 import { LumiMascot } from './LumiMascot';
 
 interface ProfileDrawerProps {
-  stories: Story[];
-  letters: Letter[];
-  submissions: StorySubmission[];
-  onSelectStory: (story: Story) => void;
-  onNavigate: (page: ActiveNavPage) => void;
+  stories?: Story[];
+  letters?: Letter[];
+  submissions?: StorySubmission[];
+  onSelectStory?: (story: Story) => void;
+  onNavigate?: (page: ActiveNavPage) => void;
 }
 
 export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
-  stories,
-  letters,
-  submissions,
+  stories = [],
+  letters = [],
+  submissions = [],
   onSelectStory,
   onNavigate,
 }) => {
@@ -46,11 +46,14 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
     notifications,
     markNotificationAsRead,
     logout,
-    role
+    role,
+    profileDrawerTab,
+    setProfileDrawerTab
   } = useAuth();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'bookmarks' | 'submissions' | 'letters' | 'notifications'>('bookmarks');
+  const activeTab = profileDrawerTab || 'bookmarks';
+  const setActiveTab = setProfileDrawerTab;
 
   if (!isProfileDrawerOpen || !user) return null;
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { 
-  ShieldCheck, 
+  LayoutDashboard, 
   BookOpen, 
   MapPin, 
   Mail, 
@@ -12,38 +12,22 @@ import {
   Users, 
   LogOut, 
   ExternalLink,
-  Sparkles,
-  Radio,
   Clock,
-  Layers,
-  CheckCircle2,
+  Layout,
+  History,
+  Menu,
+  X,
   ChevronRight,
-  HelpCircle,
-  Compass,
-  ChevronDown,
-  Menu
+  Bell,
+  Sparkles,
+  Home
 } from 'lucide-react';
-import { 
-  Story, 
-  Letter, 
-  PhotovoiceItem, 
-  SurveySubmission, 
-  StorySubmission, 
-  KindnessPoint, 
-  ResearchItem, 
-  GalleryMediaItem, 
-  SiteSettings,
-  ActiveNavPage,
-  AuditLog
-} from '../types';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import { apiService, PresenceInfo } from '../services/api';
-import { storageService } from '../services/storage';
 import { Forbidden403Page } from './Forbidden403Page';
-import { PROTECTED_ADMIN_EMAILS } from '../utils/adminAuth';
+import { ActiveNavPage } from '../types';
 
 // Admin Sub-components
+import { AdminDashboard } from '../components/admin/AdminDashboard';
 import { AdminStoriesTab } from '../components/admin/AdminStoriesTab';
 import { AdminMapTab } from '../components/admin/AdminMapTab';
 import { AdminLettersTab } from '../components/admin/AdminLettersTab';
@@ -53,28 +37,13 @@ import { AdminResearchTab } from '../components/admin/AdminResearchTab';
 import { AdminSubmissionsTab } from '../components/admin/AdminSubmissionsTab';
 import { AdminSettingsTab } from '../components/admin/AdminSettingsTab';
 import { AdminAuditTab } from '../components/admin/AdminAuditTab';
-
-interface AdminPageProps {
-  letters: Letter[];
-  photovoiceItems: PhotovoiceItem[];
-  stories: Story[];
-  surveys: SurveySubmission[];
-  submissions: StorySubmission[];
-  onApproveLetter: (id: string, reply?: string) => void;
-  onRejectLetter: (id: string) => void;
-  onDeleteLetter: (id: string) => void;
-  onApprovePhotovoice: (id: string) => void;
-  onRejectPhotovoice: (id: string) => void;
-  onAddStory: (story: Story) => void;
-  onUpdateStory?: (id: string, updates: Partial<Story>) => void;
-  onDeleteStory?: (id: string) => void;
-  onConvertSubmission?: (submissionId: string) => void;
-  onRejectSubmission?: (submissionId: string, feedback?: string) => void;
-  onNavigate?: (page: ActiveNavPage) => void;
-}
+import { AdminHomepageTab } from '../components/admin/AdminHomepageTab';
+import { AdminUsersTab } from '../components/admin/AdminUsersTab';
 
 export type AdminTabType = 
+  | 'dashboard'
   | 'stories'
+  | 'homepage'
   | 'map'
   | 'letters'
   | 'music'
@@ -82,717 +51,288 @@ export type AdminTabType =
   | 'research'
   | 'submissions'
   | 'settings'
-  | 'audit';
+  | 'audit'
+  | 'users';
 
-export const AdminPage: React.FC<AdminPageProps> = ({
-  letters,
-  photovoiceItems,
-  stories,
-  surveys,
-  submissions,
-  onApproveLetter,
-  onRejectLetter,
-  onDeleteLetter,
-  onApprovePhotovoice,
-  onRejectPhotovoice,
-  onAddStory,
-  onUpdateStory,
-  onDeleteStory,
-  onConvertSubmission,
-  onRejectSubmission,
-  onNavigate
-}) => {
-  const { user, role, isAdmin, isSuperAdmin, logout } = useAuth();
-  const { showToast } = useToast();
+interface AdminPageProps {
+  onNavigate?: (page: ActiveNavPage) => void;
+}
 
-  const [activeTab, setActiveTab] = useState<AdminTabType>('stories');
+export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
+  const { user, role, isAdmin, logout, loading: authLoading } = useAuth();
+  const [activeTab, setActiveTab] = useState<AdminTabType>('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Real-time presences state
-  const [presences, setPresences] = useState<PresenceInfo[]>([]);
+  if (authLoading) return null;
 
-  // Collections state managed within Admin
-  const [mapPoints, setMapPoints] = useState<KindnessPoint[]>(() => storageService.getMapPoints());
-  const [musicList, setMusicList] = useState<any[]>(() => storageService.getMusic());
-  const [galleryItems, setGalleryItems] = useState<GalleryMediaItem[]>(() => storageService.getGallery());
-  const [researchItems, setResearchItems] = useState<ResearchItem[]>(() => storageService.getResearch());
-  const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => storageService.getSiteSettings());
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => storageService.getAuditLogs());
-  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
-
-  // Sync with server API on mount
-  useEffect(() => {
-    const syncData = async () => {
-      try {
-        const [serverPoints, serverMusic, serverGallery, serverResearch, serverSettings] = await Promise.all([
-          apiService.getMapPoints().catch(() => null),
-          apiService.getMusicItems().catch(() => null),
-          apiService.getGalleryItems().catch(() => null),
-          apiService.getResearchItems().catch(() => null),
-          apiService.getSettings().catch(() => null)
-        ]);
-
-        if (serverPoints) setMapPoints(serverPoints);
-        if (serverMusic) setMusicList(serverMusic);
-        if (serverGallery) setGalleryItems(serverGallery);
-        if (serverResearch) setResearchItems(serverResearch);
-        if (serverSettings) setSiteSettings(serverSettings);
-      } catch {
-        // Fall back to storageService defaults
-      }
-    };
-
-    syncData();
-  }, []);
-
-  // Real-time heartbeat / presence ping
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const ping = async () => {
-      try {
-        const activeList = await apiService.sendPresence(
-          user.email,
-          user.displayName || user.email.split('@')[0],
-          activeTab
-        );
-        setPresences(activeList);
-      } catch {
-        // quiet fallback
-      }
-    };
-
-    ping();
-    const interval = setInterval(ping, 10000);
-    return () => clearInterval(interval);
-  }, [user, isAdmin, activeTab]);
-
-  // Load audit logs from server
-  const loadLogs = useCallback(async () => {
-    if (!user) return;
-    setIsLoadingLogs(true);
-    try {
-      const logs = await apiService.getAuditLogs(user.email);
-      setAuditLogs(logs);
-    } catch {
-      setAuditLogs(storageService.getAuditLogs());
-    } finally {
-      setIsLoadingLogs(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (activeTab === 'audit') {
-      loadLogs();
-    }
-  }, [activeTab, loadLogs]);
-
-  // Guard: User must be authenticated and is Admin
   if (!user || !isAdmin) {
-    return <Forbidden403Page onNavigate={onNavigate || (() => {})} />;
+    return <Forbidden403Page onNavigate={(p) => onNavigate ? onNavigate(p) : (window.location.href = '/')} />;
   }
 
-  // --- CRUD HANDLERS FOR MAP POINTS ---
-  const handleAddMapPoint = async (point: Partial<KindnessPoint>) => {
-    const created = storageService.addMapPoint(point);
-    setMapPoints(storageService.getMapPoints());
-    try {
-      await apiService.createMapPoint(point, user.email);
-    } catch {
-      // already in localStorage
-    }
-    showToast('Đã thêm điểm tử tế mới vào bản đồ', { type: 'success' });
-  };
-
-  const handleUpdateMapPoint = async (id: string, updates: Partial<KindnessPoint>) => {
-    const updated = storageService.updateMapPoint(id, updates);
-    setMapPoints(updated);
-    try {
-      await apiService.updateMapPoint(id, updates, user.email);
-    } catch {
-      // local updated
-    }
-    showToast('Đã cập nhật điểm bản đồ thành công', { type: 'success' });
-  };
-
-  const handleDeleteMapPoint = async (id: string) => {
-    const updated = storageService.deleteMapPoint(id);
-    setMapPoints(updated);
-    try {
-      await apiService.deleteMapPoint(id, user.email);
-    } catch {
-      // local updated
-    }
-    showToast('Đã xóa điểm tử tế khỏi bản đồ', { type: 'info' });
-  };
-
-  // --- CRUD HANDLERS FOR MUSIC ---
-  const handleAddMusic = async (song: any) => {
-    const created = storageService.addMusicItem(song);
-    setMusicList(storageService.getMusic());
-    try {
-      await apiService.createMusicItem(song, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã thêm ca khúc mới vào Góc âm nhạc 432Hz', { type: 'success' });
-  };
-
-  const handleUpdateMusic = async (id: string, updates: any) => {
-    const updated = storageService.updateMusicItem(id, updates);
-    setMusicList(updated);
-    try {
-      await apiService.updateMusicItem(id, updates, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã cập nhật thông tin ca khúc', { type: 'success' });
-  };
-
-  const handleDeleteMusic = async (id: string) => {
-    const updated = storageService.deleteMusicItem(id);
-    setMusicList(updated);
-    try {
-      await apiService.deleteMusicItem(id, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã xóa bài hát khỏi hệ thống', { type: 'info' });
-  };
-
-  // --- CRUD HANDLERS FOR GALLERY ---
-  const handleAddGalleryItem = async (item: Partial<GalleryMediaItem>) => {
-    const created = storageService.addGalleryItem(item);
-    setGalleryItems(storageService.getGallery());
-    try {
-      await apiService.createGalleryItem(item, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã đăng tác phẩm hình ảnh mới', { type: 'success' });
-  };
-
-  const handleUpdateGalleryItem = async (id: string, updates: Partial<GalleryMediaItem>) => {
-    const updated = storageService.updateGalleryItem(id, updates);
-    setGalleryItems(updated);
-    try {
-      await apiService.updateGalleryItem(id, updates, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã cập nhật tác phẩm hình ảnh', { type: 'success' });
-  };
-
-  const handleDeleteGalleryItem = async (id: string) => {
-    const updated = storageService.deleteGalleryItem(id);
-    setGalleryItems(updated);
-    try {
-      await apiService.deleteGalleryItem(id, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã xóa tác phẩm khỏi thư viện', { type: 'info' });
-  };
-
-  // --- CRUD HANDLERS FOR RESEARCH ---
-  const handleAddResearch = async (item: Partial<ResearchItem>) => {
-    const created = storageService.addResearchItem(item);
-    setResearchItems(storageService.getResearch());
-    try {
-      await apiService.createResearchItem(item, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã thêm đề tài nghiên cứu khoa học mới', { type: 'success' });
-  };
-
-  const handleUpdateResearch = async (id: string, updates: Partial<ResearchItem>) => {
-    const updated = storageService.updateResearchItem(id, updates);
-    setResearchItems(updated);
-    try {
-      await apiService.updateResearchItem(id, updates, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã cập nhật đề tài nghiên cứu', { type: 'success' });
-  };
-
-  const handleDeleteResearch = async (id: string) => {
-    const updated = storageService.deleteResearchItem(id);
-    setResearchItems(updated);
-    try {
-      await apiService.deleteResearchItem(id, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã xóa đề tài khỏi danh mục nghiên cứu', { type: 'info' });
-  };
-
-  // --- SETTINGS HANDLER ---
-  const handleSaveSettings = async (newSettings: SiteSettings) => {
-    storageService.saveSiteSettings(newSettings);
-    setSiteSettings(newSettings);
-    try {
-      await apiService.updateSettings(newSettings, user.email);
-    } catch {
-      // local
-    }
-    showToast('Đã lưu cấu hình chung website', { type: 'success' });
-  };
-
-  // Count pending submissions
-  const pendingSubmissionsCount = submissions.filter(s => s.status === 'pending').length;
-  const pendingLettersCount = letters.filter(l => l.status === 'pending').length;
-  const otherAdminsOnline = presences.filter(p => p.userId?.toLowerCase() !== user.email.toLowerCase()).length;
-
-  // 9 functional modules organized into 3 clear categories for the vertical left sidebar
-  const menuCategories = [
+  const menuGroups = [
     {
-      title: 'Nội Dung Tử Tế',
+      title: 'Tổng quan',
       items: [
-        {
-          id: 'stories' as AdminTabType,
-          label: '1. Câu chuyện tử tế',
-          icon: BookOpen,
-          badge: (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'stories' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {stories.length}
-            </span>
-          )
-        },
-        {
-          id: 'map' as AdminTabType,
-          label: '2. Bản đồ tử tế',
-          icon: Compass,
-          badge: (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'map' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {mapPoints.length}
-            </span>
-          )
-        },
-        {
-          id: 'letters' as AdminTabType,
-          label: '3. Hộp thư yêu thương',
-          icon: Mail,
-          badge: pendingLettersCount > 0 ? (
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
-              {pendingLettersCount} chờ
-            </span>
-          ) : (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'letters' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {letters.length}
-            </span>
-          )
-        },
-        {
-          id: 'music' as AdminTabType,
-          label: '4. Góc âm nhạc 432Hz',
-          icon: Music,
-          badge: (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'music' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {musicList.length}
-            </span>
-          )
-        },
-        {
-          id: 'gallery' as AdminTabType,
-          label: '5. Hình ảnh & Photovoice',
-          icon: ImageIcon,
-          badge: (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'gallery' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {galleryItems.length + photovoiceItems.length}
-            </span>
-          )
-        },
-        {
-          id: 'research' as AdminTabType,
-          label: '6. Đề tài nghiên cứu',
-          icon: GraduationCap,
-          badge: (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'research' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {researchItems.length}
-            </span>
-          )
-        }
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'audit', label: 'Nhật ký hoạt động', icon: History },
       ]
     },
     {
-      title: 'Tiếp Nhận & Đóng Góp',
+      title: 'Quản lý Nội dung',
       items: [
-        {
-          id: 'submissions' as AdminTabType,
-          label: '7. Bài đóng góp (Kể LUMI)',
-          icon: Send,
-          badge: pendingSubmissionsCount > 0 ? (
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-sky-100 text-sky-800 border border-sky-300 animate-pulse">
-              {pendingSubmissionsCount} mới
-            </span>
-          ) : (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold transition-colors ${
-              activeTab === 'submissions' 
-                ? 'bg-white/20 text-white border border-white/30' 
-                : 'bg-slate-100 text-slate-600 border border-slate-200/80 group-hover:bg-sky-100 group-hover:text-sky-700'
-            }`}>
-              {submissions.length}
-            </span>
-          )
-        }
+        { id: 'homepage', label: 'Trang chủ (CMS)', icon: Layout },
+        { id: 'stories', label: 'Bài viết / Chuyện kể', icon: BookOpen },
+        { id: 'submissions', label: 'Duyệt bài gửi về', icon: Send },
+        { id: 'letters', label: 'Hộp thư yêu thương', icon: Mail },
       ]
     },
     {
-      title: 'Hệ Thống & Điều Hành',
+      title: 'Media & Interactive',
       items: [
-        {
-          id: 'settings' as AdminTabType,
-          label: '8. Cấu hình website',
-          icon: Settings,
-          badge: undefined
-        },
-        {
-          id: 'audit' as AdminTabType,
-          label: '9. Quản trị & Kiểm toán',
-          icon: Users,
-          badge: (
-            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-              Online
-            </span>
-          )
-        }
+        { id: 'gallery', label: 'Thư viện Media', icon: ImageIcon },
+        { id: 'map', label: 'Bản đồ tử tế', icon: MapPin },
+        { id: 'music', label: 'Âm nhạc 432Hz', icon: Music },
+        { id: 'research', label: 'Nghiên cứu hành vi', icon: GraduationCap },
+      ]
+    },
+    {
+      title: 'Hệ thống',
+      items: [
+        { id: 'users', label: 'Người dùng & Quyền', icon: Users },
+        { id: 'settings', label: 'Cài đặt chung', icon: Settings },
       ]
     }
   ];
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'dashboard': return <AdminDashboard onNavigate={setActiveTab} />;
+      case 'stories': return <AdminStoriesTab />;
+      case 'homepage': return <AdminHomepageTab onNavigate={onNavigate} />;
+      case 'map': return <AdminMapTab />;
+      case 'letters': return <AdminLettersTab />;
+      case 'music': return <AdminMusicTab />;
+      case 'gallery': return <AdminGalleryTab />;
+      case 'research': return <AdminResearchTab />;
+      case 'submissions': return <AdminSubmissionsTab />;
+      case 'users': return <AdminUsersTab />;
+      case 'settings': return <AdminSettingsTab />;
+      case 'audit': return <AdminAuditTab />;
+      default: return <AdminDashboard onNavigate={setActiveTab} />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50/70 via-blue-50/40 to-slate-50 text-slate-800 relative overflow-hidden font-sans selection:bg-sky-500 selection:text-white pt-20 pb-20">
-      {/* High-tech Blue Glow / Ambient Soft Lighting */}
-      <div className="absolute top-0 left-1/4 w-[32rem] h-[32rem] bg-sky-200/35 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/3 right-10 w-[30rem] h-[30rem] bg-cyan-200/30 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-[26rem] h-[26rem] bg-blue-200/25 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-[1560px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-6">
-        
-        {/* Top Command Bar: Modern Tech Blue & Clean White */}
-        <div className="bg-white/95 backdrop-blur-xl border border-sky-100/90 rounded-3xl p-5 shadow-lg shadow-sky-500/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 via-cyan-500 to-blue-600 p-0.5 shadow-md shadow-sky-500/20 flex items-center justify-center">
-                <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
-                  <ShieldCheck className="w-6 h-6 text-sky-600" />
-                </div>
-              </div>
-              <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white ring-2 ring-emerald-400/40" />
+    <div className="min-h-screen bg-slate-50 flex overflow-hidden">
+      {/* Sidebar - Desktop */}
+      <aside 
+        className={`bg-slate-900 text-slate-400 flex-shrink-0 transition-all duration-300 ease-in-out flex flex-col ${
+          sidebarOpen ? 'w-64' : 'w-20'
+        } hidden lg:flex`}
+      >
+        <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-sky-500 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-display font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Trung Tâm Quản Trị Hệ Thống LUMI</span>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 border border-sky-200 uppercase tracking-wider">
-                    CMS 2.0
-                  </span>
-                </h1>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                <span>Quản trị viên: <strong className="text-sky-700 font-bold">{user.email}</strong></span>
-                <span className="text-slate-300">•</span>
-                <span className="text-emerald-700 font-semibold flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {otherAdminsOnline > 0 ? `Có ${otherAdminsOnline} quản trị viên khác đang online` : 'Hệ thống an toàn / Trực tuyến'}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2.5 flex-shrink-0">
-            {onNavigate && (
-              <button
-                onClick={() => onNavigate('home')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold border border-sky-200 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-sky-600" />
-                <span>Xem Trang Công Khai</span>
-              </button>
-            )}
-
-            <button
-              onClick={() => logout()}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition-all cursor-pointer shadow-2xs"
-              title="Đăng xuất khỏi hệ thống quản trị"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Đăng xuất</span>
-            </button>
+            {sidebarOpen && <span className="ml-3 font-black text-white tracking-tighter text-xl">LUMI CMS</span>}
           </div>
         </div>
 
-        {/* 2-Column Command Workspace: Vertical Left Sidebar & Right Dynamic Content Area */}
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          
-          {/* LEFT VERTICAL SIDEBAR MENU (Mép trái - Tone Xanh, Trắng, Nhạt) */}
-          <aside className="w-full lg:w-72 xl:w-80 flex-shrink-0 lg:sticky lg:top-24 space-y-4">
-            
-            {/* Mobile Expand / Collapse Bar */}
-            <div className="lg:hidden bg-white/95 border border-sky-100 rounded-2xl p-3 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-sky-600" />
-                <span className="text-xs font-bold text-slate-800">
-                  {menuCategories.flatMap(c => c.items).find(i => i.id === activeTab)?.label || 'Chọn phân hệ'}
-                </span>
-              </div>
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="px-3 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-xs font-bold text-sky-700 border border-sky-200 flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <span>{mobileMenuOpen ? 'Đóng menu' : 'Đổi phân hệ'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${mobileMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-
-            {/* Sidebar Content Panel */}
-            <div className={`bg-white/95 backdrop-blur-xl border border-sky-100/90 rounded-3xl p-4 sm:p-5 shadow-lg shadow-sky-500/5 space-y-5 ${mobileMenuOpen ? 'block' : 'hidden lg:block'}`}>
-              
-              {/* Sidebar Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-sky-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center border border-sky-200/80 shadow-2xs">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                    Menu Quản Trị
-                  </span>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200 font-extrabold">
-                  9 Phân hệ
-                </span>
-              </div>
-
-              {/* Vertical Menu Groups */}
-              <nav className="space-y-4">
-                {menuCategories.map((cat, catIdx) => (
-                  <div key={catIdx} className="space-y-1.5">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-3 py-1">
-                      {cat.title}
-                    </div>
-
-                    <div className="space-y-1">
-                      {cat.items.map((item) => {
-                        const isActive = activeTab === item.id;
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => {
-                              setActiveTab(item.id);
-                              setMobileMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all duration-150 text-left group cursor-pointer ${
-                              isActive
-                                ? 'bg-gradient-to-r from-sky-500 via-blue-600 to-cyan-600 text-white shadow-md shadow-sky-500/20'
-                                : 'text-slate-600 hover:text-sky-700 hover:bg-sky-50/80'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 transition-all ${
-                                isActive
-                                  ? 'bg-white/20 text-white shadow-xs'
-                                  : 'bg-slate-100 text-slate-500 group-hover:bg-sky-100 group-hover:text-sky-700'
-                              }`}>
-                                <Icon className="w-3.5 h-3.5" />
-                              </div>
-                              <span className={`truncate text-xs ${isActive ? 'text-white font-black' : 'font-semibold group-hover:text-sky-800'}`}>
-                                {item.label}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              {item.badge}
-                              {isActive && (
-                                <ChevronRight className="w-3.5 h-3.5 text-white animate-pulse" />
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+        <div className="flex-1 overflow-y-auto py-6 scrollbar-hide">
+          {menuGroups.map((group, idx) => (
+            <div key={idx} className="mb-6">
+              {sidebarOpen && <p className="px-6 mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">{group.title}</p>}
+              <nav className="px-3 space-y-1">
+                {group.items.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id as AdminTabType)}
+                    className={`w-full flex items-center h-10 px-3 rounded-xl transition-all cursor-pointer ${
+                      activeTab === item.id 
+                        ? 'bg-sky-600 text-white shadow-lg shadow-sky-900/20' 
+                        : 'hover:bg-slate-800 hover:text-slate-200'
+                    }`}
+                  >
+                    <item.icon className={`w-5 h-5 flex-shrink-0 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
+                    {sidebarOpen && <span className="ml-3 text-sm font-bold truncate">{item.label}</span>}
+                  </button>
                 ))}
               </nav>
-
-              {/* Sidebar Footer: System Status */}
-              <div className="pt-3 border-t border-sky-100">
-                <div className="bg-gradient-to-br from-sky-50/90 via-blue-50/50 to-slate-50 rounded-2xl p-3.5 border border-sky-200/70 space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Trạng thái máy chủ:</span>
-                    <span className="text-emerald-700 font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Trực tuyến
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Đồng bộ:</span>
-                    <span className="text-sky-700 font-bold">Thời gian thực</span>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-slate-500 font-medium">Phân quyền:</span>
-                    <span className="text-indigo-700 font-bold">
-                      {isSuperAdmin ? 'Super Admin' : 'Admin'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
             </div>
-          </aside>
-
-          {/* RIGHT WORKSPACE: Dynamic Tab Body */}
-          <main className="flex-1 w-full min-w-0">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 shadow-lg shadow-sky-500/5 border border-sky-100/90 text-slate-800 transition-all duration-200">
-          
-          {activeTab === 'stories' && (
-            <AdminStoriesTab
-              stories={stories}
-              onAddStory={onAddStory}
-              onUpdateStory={onUpdateStory}
-              onDeleteStory={onDeleteStory}
-              operatorEmail={user.email}
-              onSelectStory={(story) => {
-                if (onNavigate) {
-                  onNavigate('stories');
-                }
-              }}
-            />
-          )}
-
-          {activeTab === 'map' && (
-            <AdminMapTab
-              points={mapPoints}
-              onAddPoint={handleAddMapPoint}
-              onUpdatePoint={handleUpdateMapPoint}
-              onDeletePoint={handleDeleteMapPoint}
-              onNavigateToMap={onNavigate ? () => onNavigate('map') : undefined}
-            />
-          )}
-
-          {activeTab === 'letters' && (
-            <AdminLettersTab
-              letters={letters}
-              onApproveLetter={onApproveLetter}
-              onRejectLetter={onRejectLetter}
-              onDeleteLetter={onDeleteLetter}
-              onAddLetter={(letter) => {
-                storageService.addLetter(letter);
-                showToast('Đã đăng lá thư mới vào Hộp thư', { type: 'success' });
-              }}
-              onUpdateLetter={(id, updates) => {
-                storageService.updateLetter(id, updates);
-                showToast('Đã lưu nội dung lá thư', { type: 'success' });
-              }}
-            />
-          )}
-
-          {activeTab === 'music' && (
-            <AdminMusicTab
-              musicList={musicList}
-              onAddMusic={handleAddMusic}
-              onUpdateMusic={handleUpdateMusic}
-              onDeleteMusic={handleDeleteMusic}
-              onNavigateToMusic={onNavigate ? () => onNavigate('music') : undefined}
-            />
-          )}
-
-          {activeTab === 'gallery' && (
-            <AdminGalleryTab
-              galleryItems={galleryItems}
-              photovoiceItems={photovoiceItems}
-              onAddGalleryItem={handleAddGalleryItem}
-              onUpdateGalleryItem={handleUpdateGalleryItem}
-              onDeleteGalleryItem={handleDeleteGalleryItem}
-              onApprovePhotovoice={onApprovePhotovoice}
-              onRejectPhotovoice={onRejectPhotovoice}
-              onNavigateToGallery={onNavigate ? () => onNavigate('gallery') : undefined}
-            />
-          )}
-
-          {activeTab === 'research' && (
-            <AdminResearchTab
-              researchItems={researchItems}
-              onAddResearch={handleAddResearch}
-              onUpdateResearch={handleUpdateResearch}
-              onDeleteResearch={handleDeleteResearch}
-              onNavigateToResearch={onNavigate ? () => onNavigate('research') : undefined}
-            />
-          )}
-
-          {activeTab === 'submissions' && (
-            <AdminSubmissionsTab
-              submissions={submissions}
-              onConvertSubmission={(id) => {
-                if (onConvertSubmission) onConvertSubmission(id);
-                showToast('Đã phê duyệt và chuyển thành Câu chuyện tử tế công khai!', { type: 'success' });
-              }}
-              onRejectSubmission={(id, feedback) => {
-                if (onRejectSubmission) onRejectSubmission(id, feedback);
-                showToast('Đã từ chối bài đóng góp', { type: 'info' });
-              }}
-              onDeleteSubmission={(id) => {
-                storageService.deleteSubmission(id);
-                showToast('Đã xóa bài đóng góp', { type: 'info' });
-              }}
-            />
-          )}
-
-          {activeTab === 'settings' && (
-            <AdminSettingsTab
-              settings={siteSettings}
-              onSaveSettings={handleSaveSettings}
-              onResetDatabase={() => {
-                storageService.resetToDefaults();
-                showToast('Đã khôi phục dữ liệu mẫu ban đầu!', { type: 'sparkle' });
-                window.location.reload();
-              }}
-            />
-          )}
-
-          {activeTab === 'audit' && (
-            <AdminAuditTab
-              logs={auditLogs}
-              presences={presences}
-              currentUserEmail={user.email}
-              onRefreshLogs={loadLogs}
-              isLoading={isLoadingLogs}
-            />
-          )}
-
-            </div>
-          </main>
+          ))}
         </div>
 
+        <div className="p-4 border-t border-slate-800 space-y-1">
+          <button 
+            onClick={() => onNavigate ? onNavigate('home') : (window.location.href = '/')}
+            className={`w-full flex items-center h-10 px-3 rounded-xl text-sky-400 bg-sky-950/40 hover:bg-sky-900/50 transition-all cursor-pointer ${!sidebarOpen && 'justify-center'}`}
+            title="Quay lại xem Website"
+          >
+            <Home className="w-5 h-5 flex-shrink-0 text-sky-400" />
+            {sidebarOpen && <span className="ml-3 text-sm font-bold">Về Website</span>}
+          </button>
+          <button 
+            onClick={logout}
+            className={`w-full flex items-center h-10 px-3 rounded-xl hover:bg-rose-500/10 hover:text-rose-400 transition-all cursor-pointer ${!sidebarOpen && 'justify-center'}`}
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {sidebarOpen && <span className="ml-3 text-sm font-bold">Đăng xuất</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0 z-20 shadow-xs">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hidden lg:flex p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <button 
+              onClick={() => setMobileMenuOpen(true)}
+              className="lg:hidden p-2 hover:bg-slate-100 rounded-lg text-slate-400 transition-colors cursor-pointer"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="h-6 w-px bg-slate-200 hidden lg:block" />
+            <div className="text-xs font-bold text-slate-400 flex items-center gap-2">
+              <span className="hidden sm:inline">QUẢN TRỊ VIÊN</span>
+              <ChevronRight className="w-3 h-3" />
+              <span className="text-slate-800 uppercase">
+                {menuGroups.flatMap(g => g.items).find(i => i.id === activeTab)?.label}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 sm:gap-4">
+            <button
+              onClick={() => onNavigate ? onNavigate('home') : (window.location.href = '/')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 cursor-pointer shadow-2xs"
+              title="Quay lại trang chủ người dùng"
+            >
+              <Home className="w-3.5 h-3.5 text-sky-600" />
+              <span className="hidden sm:inline">Về Website</span>
+            </button>
+
+            <div className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-slate-50 rounded-full border border-slate-100">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Hệ thống Trực tuyến</span>
+            </div>
+            
+            <button 
+              onClick={() => setActiveTab('audit')}
+              title="Xem nhật ký hoạt động / thông báo"
+              className="relative p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-all cursor-pointer"
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+            </button>
+
+            <div className="h-8 w-px bg-slate-200 mx-1" />
+
+            <div className="flex items-center gap-3">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs font-bold text-slate-800 leading-none">{user?.displayName}</p>
+                <p className="text-[10px] font-black text-sky-600 uppercase mt-1 leading-none">{user?.role}</p>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 p-0.5 shadow-sm">
+                <div className="w-full h-full rounded-[10px] bg-white overflow-hidden flex items-center justify-center">
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="font-bold text-sky-600 text-sm">{user?.displayName?.charAt(0)}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Content Scroll Area */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+          <div className="max-w-6xl mx-auto">
+            {renderContent()}
+          </div>
+        </main>
       </div>
+
+      {/* Mobile Drawer Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-50 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+          <aside 
+            className="absolute top-0 left-0 bottom-0 w-72 bg-slate-900 flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="h-16 flex items-center justify-between px-6 border-b border-slate-800">
+              <div className="flex items-center">
+                <Sparkles className="w-5 h-5 text-sky-500" />
+                <span className="ml-3 font-black text-white tracking-tighter text-xl">LUMI CMS</span>
+              </div>
+              <button onClick={() => setMobileMenuOpen(false)} className="text-slate-500 cursor-pointer">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto py-6">
+              {menuGroups.map((group, idx) => (
+                <div key={idx} className="mb-6">
+                  <p className="px-6 mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">{group.title}</p>
+                  <nav className="px-3 space-y-1">
+                    {group.items.map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setActiveTab(item.id as AdminTabType);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center h-12 px-4 rounded-xl transition-all cursor-pointer ${
+                          activeTab === item.id 
+                            ? 'bg-sky-600 text-white' 
+                            : 'text-slate-400 hover:bg-slate-800'
+                        }`}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        <span className="ml-3 text-sm font-bold">{item.label}</span>
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-4 border-t border-slate-800 space-y-2">
+              <button 
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  if (onNavigate) onNavigate('home');
+                  else window.location.href = '/';
+                }}
+                className="w-full flex items-center h-11 px-4 rounded-xl text-sky-400 bg-sky-950/60 hover:bg-sky-900/60 font-bold transition-all cursor-pointer"
+              >
+                <Home className="w-5 h-5" />
+                <span className="ml-3 text-sm">Quay lại Website</span>
+              </button>
+              <button 
+                onClick={logout}
+                className="w-full flex items-center h-11 px-4 rounded-xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 cursor-pointer transition-all"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="ml-3 text-sm font-bold">Đăng xuất</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 };

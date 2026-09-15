@@ -22,13 +22,20 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   const filteredResults = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase().trim();
-    return stories.filter(s => 
-      s.title.toLowerCase().includes(q) ||
-      s.province.toLowerCase().includes(q) ||
-      s.category.toLowerCase().includes(q) ||
-      s.excerpt.toLowerCase().includes(q) ||
-      s.tags.some(t => t.toLowerCase().includes(q))
-    );
+    return (stories || []).filter(s => {
+      if (!s) return false;
+      const title = (s.title || '').toLowerCase();
+      const province = (s.province || '').toLowerCase();
+      const category = (s.category || '').toLowerCase();
+      const excerpt = (s.excerpt || '').toLowerCase();
+      const matchTags = Array.isArray(s.tags) && s.tags.some(t => typeof t === 'string' && t.toLowerCase().includes(q));
+
+      return title.includes(q) ||
+        province.includes(q) ||
+        category.includes(q) ||
+        excerpt.includes(q) ||
+        matchTags;
+    });
   }, [query, stories]);
 
   if (!isOpen) return null;

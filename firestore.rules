@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Check if the user is a super admin based on their email
+    function isSuperAdmin() {
+      return request.auth != null && 
+        (request.auth.token.email == 'nguyenhuy.thudaumot@gmail.com' || 
+         request.auth.token.email == 'vanchien.vov@gmail.com');
+    }
+
+    // Generic allow-all for super admins
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Public content - allow anyone to read
+    match /posts/{postId} {
+      allow read: if (resource.data.status == 'published' && (!('isDeleted' in resource.data) || resource.data.isDeleted == false)) || isSuperAdmin();
+    }
+
+    match /gallery/{itemId} {
+      allow read: if true;
+    }
+
+    match /music/{songId} {
+      allow read: if true;
+    }
+    
+    match /photovoice/{itemId} {
+      allow read: if resource.data.status == 'approved' || isSuperAdmin();
+      allow create: if request.auth != null;
+    }
+
+    match /letters/{letterId} {
+      allow read: if resource.data.status == 'approved' || (request.auth != null && request.auth.uid == resource.data.userId) || isSuperAdmin();
+      allow create: if request.auth != null;
+    }
+
+    match /surveys/{surveyId} {
+      allow read: if isSuperAdmin();
+      allow create: if true;
+    }
+    
+    match /submissions/{submissionId} {
+      allow read: if isSuperAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+      allow create: if request.auth != null;
+    }
+
+    match /users/{userId} {
+      // Allow users to read their own profile, or super admins to read any profile
+      allow read: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+      // Allow users to create their own profile
+      allow create: if request.auth != null && request.auth.uid == userId;
+      // Allow users to update their own profile, or super admins to update any
+      allow update: if request.auth != null && (request.auth.uid == userId || isSuperAdmin());
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if request.auth != null;
+    }
+
+    match /homepage/{docId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+  }
+}

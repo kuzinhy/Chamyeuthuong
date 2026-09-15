@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Image as ImageIcon, 
   Plus, 
@@ -12,21 +12,12 @@ import {
   ExternalLink,
   Sparkles,
   Camera,
-  Heart
+  Heart,
+  RefreshCw
 } from 'lucide-react';
 import { GalleryMediaItem, GalleryCategory, PhotovoiceItem } from '../../types';
-
-interface AdminGalleryTabProps {
-  galleryItems: GalleryMediaItem[];
-  photovoiceItems: PhotovoiceItem[];
-  onAddGalleryItem: (item: Partial<GalleryMediaItem>) => void;
-  onUpdateGalleryItem: (id: string, updates: Partial<GalleryMediaItem>) => void;
-  onDeleteGalleryItem: (id: string) => void;
-  onApprovePhotovoice: (id: string) => void;
-  onRejectPhotovoice: (id: string) => void;
-  onDeletePhotovoice?: (id: string) => void;
-  onNavigateToGallery?: () => void;
-}
+import { storage } from '../../services/storage';
+import { useToast } from '../../context/ToastContext';
 
 const CATEGORIES: GalleryCategory[] = [
   'Hình ảnh câu chuyện',
@@ -35,20 +26,34 @@ const CATEGORIES: GalleryCategory[] = [
   'Hình ảnh hoạt động'
 ];
 
-export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
-  galleryItems,
-  photovoiceItems,
-  onAddGalleryItem,
-  onUpdateGalleryItem,
-  onDeleteGalleryItem,
-  onApprovePhotovoice,
-  onRejectPhotovoice,
-  onDeletePhotovoice,
-  onNavigateToGallery
-}) => {
+export const AdminGalleryTab: React.FC = () => {
+  const [galleryItems, setGalleryItems] = useState<GalleryMediaItem[]>([]);
+  const [photovoiceItems, setPhotovoiceItems] = useState<PhotovoiceItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [subTab, setSubTab] = useState<'gallery' | 'photovoice'>('gallery');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [gallery, photovoice] = await Promise.all([
+        storage.getGallery(),
+        storage.getPhotovoice()
+      ]);
+      setGalleryItems(gallery || []);
+      setPhotovoiceItems(photovoice || []);
+    } catch (error) {
+      showToast('Không thể tải dữ liệu thư viện', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -68,19 +73,19 @@ export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
   });
   const [tagInput, setTagInput] = useState('');
 
-  const filteredGallery = galleryItems.filter(item => {
+  const filteredGallery = (galleryItems || []).filter(item => {
     const matchesSearch = 
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.credit?.toLowerCase().includes(searchQuery.toLowerCase());
+      (item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.credit || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
-  const filteredPhotovoice = photovoiceItems.filter(p => 
-    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.story.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPhotovoice = (photovoiceItems || []).filter(p => 
+    (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.studentName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (p.story || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleOpenAdd = () => {
@@ -105,28 +110,61 @@ export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title?.trim() || !formData.imageUrl?.trim()) {
-      alert('Vui lòng nhập tên tác phẩm và link ảnh hợp lệ!');
+      showToast('Vui lòng nhập tên tác phẩm và link ảnh hợp lệ!', 'error');
       return;
     }
 
-    if (editingItem) {
-      onUpdateGalleryItem(editingItem.id, formData);
-    } else {
-      onAddGalleryItem({
-        ...formData,
-        date: new Date().toLocaleDateString('vi-VN'),
-        likes: 0
-      });
+    try {
+      if (editingItem) {
+        await storage.updateGalleryItem(editingItem.id, formData);
+        showToast('Đã cập nhật tác phẩm', 'success');
+      } else {
+        await storage.addGalleryItem({
+          ...formData,
+          date: new Date().toLocaleDateString('vi-VN'),
+          likes: 0
+        } as any);
+        showToast('Đã thêm tác phẩm mới', 'success');
+      }
+      setIsModalOpen(false);
+      loadData();
+    } catch (error) {
+      showToast('Lỗi khi lưu tác phẩm', 'error');
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    onDeleteGalleryItem(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await storage.deleteGalleryItem(id);
+      showToast('Đã xóa tác phẩm', 'success');
+      loadData();
+    } catch (error) {
+      showToast('Lỗi khi xóa tác phẩm', 'error');
+    }
     setDeleteConfirmId(null);
+  };
+
+  const handleApprovePhotovoice = async (id: string) => {
+    try {
+      await storage.updatePhotovoiceStatus(id, 'approved');
+      showToast('Đã duyệt bài Photovoice', 'success');
+      loadData();
+    } catch (error) {
+      showToast('Lỗi khi duyệt bài Photovoice', 'error');
+    }
+  };
+
+  const handleRejectPhotovoice = async (id: string) => {
+    try {
+      await storage.updatePhotovoiceStatus(id, 'rejected');
+      showToast('Đã từ chối bài Photovoice', 'info');
+      loadData();
+    } catch (error) {
+      showToast('Lỗi khi từ chối bài Photovoice', 'error');
+    }
   };
 
   const handleAddTag = () => {
@@ -146,6 +184,14 @@ export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 text-amber-600 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -161,16 +207,6 @@ export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          {onNavigateToGallery && (
-            <button
-              onClick={onNavigateToGallery}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Xem Thư Viện Ảnh</span>
-            </button>
-          )}
-
           {subTab === 'gallery' && (
             <button
               onClick={handleOpenAdd}
@@ -401,7 +437,7 @@ export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
                         <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                           {p.status !== 'approved' && (
                             <button
-                              onClick={() => onApprovePhotovoice(p.id)}
+                              onClick={() => handleApprovePhotovoice(p.id)}
                               title="Duyệt bài này"
                               className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                             >
@@ -409,7 +445,7 @@ export const AdminGalleryTab: React.FC<AdminGalleryTabProps> = ({
                             </button>
                           )}
                           <button
-                            onClick={() => onRejectPhotovoice(p.id)}
+                            onClick={() => handleRejectPhotovoice(p.id)}
                             title="Từ chối bài"
                             className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           >

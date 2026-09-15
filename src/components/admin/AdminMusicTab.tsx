@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Music, 
   Plus, 
@@ -10,29 +10,37 @@ import {
   Check, 
   X, 
   ExternalLink,
-  Volume2
+  Volume2,
+  RefreshCw
 } from 'lucide-react';
+import { storage } from '../../services/storage';
+import { useToast } from '../../context/ToastContext';
 
-interface AdminMusicTabProps {
-  musicList: any[];
-  onAddMusic: (song: any) => void;
-  onUpdateMusic: (id: string, updates: any) => void;
-  onDeleteMusic: (id: string) => void;
-  onNavigateToMusic?: () => void;
-}
-
-export const AdminMusicTab: React.FC<AdminMusicTabProps> = ({
-  musicList,
-  onAddMusic,
-  onUpdateMusic,
-  onDeleteMusic,
-  onNavigateToMusic
-}) => {
+export const AdminMusicTab: React.FC = () => {
+  const [musicList, setMusicList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSong, setEditingSong] = useState<any | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [previewYoutubeId, setPreviewYoutubeId] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    loadMusic();
+  }, []);
+
+  const loadMusic = async () => {
+    setLoading(true);
+    try {
+      const data = await storage.getMusic();
+      setMusicList(data || []);
+    } catch (error) {
+      showToast('Không thể tải danh sách âm nhạc', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Form State
   const [formData, setFormData] = useState({
@@ -48,9 +56,9 @@ export const AdminMusicTab: React.FC<AdminMusicTabProps> = ({
     status: 'published'
   });
 
-  const filteredMusic = musicList.filter(s => 
-    s.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.artist?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMusic = (musicList || []).filter(s => 
+    (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.artist || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleOpenAdd = () => {
@@ -76,14 +84,13 @@ export const AdminMusicTab: React.FC<AdminMusicTabProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title?.trim()) {
-      alert('Vui lòng nhập tên bài hát!');
+      showToast('Vui lòng nhập tên bài hát!', 'error');
       return;
     }
 
-    // Extract youtube ID if full URL pasted
     let cleanYoutubeId = formData.youtubeId.trim();
     if (cleanYoutubeId.includes('youtube.com/watch?v=')) {
       cleanYoutubeId = cleanYoutubeId.split('watch?v=')[1]?.split('&')[0] || cleanYoutubeId;
@@ -97,18 +104,39 @@ export const AdminMusicTab: React.FC<AdminMusicTabProps> = ({
       slug: formData.title.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-')
     };
 
-    if (editingSong) {
-      onUpdateMusic(editingSong.id, payload);
-    } else {
-      onAddMusic(payload);
+    try {
+      if (editingSong) {
+        await storage.updateMusic(editingSong.id, payload);
+        showToast('Đã cập nhật bài hát', 'success');
+      } else {
+        await storage.addSong(payload as any);
+        showToast('Đã thêm bài hát mới', 'success');
+      }
+      setIsModalOpen(false);
+      loadMusic();
+    } catch (error) {
+      showToast('Lỗi khi lưu bài hát', 'error');
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    onDeleteMusic(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await storage.deleteMusic(id);
+      showToast('Đã xóa bài hát', 'success');
+      loadMusic();
+    } catch (error) {
+      showToast('Lỗi khi xóa bài hát', 'error');
+    }
     setDeleteConfirmId(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -128,15 +156,6 @@ export const AdminMusicTab: React.FC<AdminMusicTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          {onNavigateToMusic && (
-            <button
-              onClick={onNavigateToMusic}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Xem Trang Âm Nhạc</span>
-            </button>
-          )}
           <button
             onClick={handleOpenAdd}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-sky-600 hover:from-indigo-600 hover:to-sky-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-500/20 transition-all cursor-pointer flex-shrink-0"

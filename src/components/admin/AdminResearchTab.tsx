@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, 
   Plus, 
@@ -10,17 +10,12 @@ import {
   FileText, 
   ExternalLink,
   BarChart2,
-  Download
+  Download,
+  RefreshCw
 } from 'lucide-react';
 import { ResearchItem } from '../../types';
-
-interface AdminResearchTabProps {
-  researchItems: ResearchItem[];
-  onAddResearch: (item: Partial<ResearchItem>) => void;
-  onUpdateResearch: (id: string, updates: Partial<ResearchItem>) => void;
-  onDeleteResearch: (id: string) => void;
-  onNavigateToResearch?: () => void;
-}
+import { storage } from '../../services/storage';
+import { useToast } from '../../context/ToastContext';
 
 const CATEGORIES = [
   'Khoa học hành vi',
@@ -30,15 +25,28 @@ const CATEGORIES = [
   'Tài liệu tham khảo'
 ];
 
-export const AdminResearchTab: React.FC<AdminResearchTabProps> = ({
-  researchItems,
-  onAddResearch,
-  onUpdateResearch,
-  onDeleteResearch,
-  onNavigateToResearch
-}) => {
+export const AdminResearchTab: React.FC = () => {
+  const [researchItems, setResearchItems] = useState<ResearchItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    loadResearch();
+  }, []);
+
+  const loadResearch = async () => {
+    setLoading(true);
+    try {
+      const data = await storage.getResearch();
+      setResearchItems(data || []);
+    } catch (error) {
+      showToast('Không thể tải danh sách nghiên cứu', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,11 +67,11 @@ export const AdminResearchTab: React.FC<AdminResearchTabProps> = ({
     status: 'published'
   });
 
-  const filteredItems = researchItems.filter(r => {
+  const filteredItems = (researchItems || []).filter(r => {
     const matchesSearch = 
-      r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.author.toLowerCase().includes(searchQuery.toLowerCase());
+      (r.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.author || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || r.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -91,25 +99,46 @@ export const AdminResearchTab: React.FC<AdminResearchTabProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title?.trim()) {
-      alert('Vui lòng nhập tên đề tài nghiên cứu!');
+      showToast('Vui lòng nhập tên đề tài nghiên cứu!', 'error');
       return;
     }
 
-    if (editingItem) {
-      onUpdateResearch(editingItem.id, formData);
-    } else {
-      onAddResearch(formData);
+    try {
+      if (editingItem) {
+        await storage.updateResearchItem(editingItem.id, formData);
+        showToast('Đã cập nhật đề tài nghiên cứu', 'success');
+      } else {
+        await storage.addResearchItem(formData as any);
+        showToast('Đã thêm đề tài nghiên cứu mới', 'success');
+      }
+      setIsModalOpen(false);
+      loadResearch();
+    } catch (error) {
+      showToast('Lỗi khi lưu đề tài nghiên cứu', 'error');
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    onDeleteResearch(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await storage.deleteResearchItem(id);
+      showToast('Đã xóa đề tài nghiên cứu', 'success');
+      loadResearch();
+    } catch (error) {
+      showToast('Lỗi khi xóa đề tài nghiên cứu', 'error');
+    }
     setDeleteConfirmId(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -129,16 +158,6 @@ export const AdminResearchTab: React.FC<AdminResearchTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          {onNavigateToResearch && (
-            <button
-              onClick={onNavigateToResearch}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Xem Trang Nghiên Cứu</span>
-            </button>
-          )}
-
           <button
             onClick={handleOpenAdd}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white rounded-xl text-sm font-bold shadow-md shadow-emerald-500/20 transition-all cursor-pointer flex-shrink-0"

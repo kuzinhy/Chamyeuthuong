@@ -1,17 +1,19 @@
 export type RegionType = 'Bắc' | 'Trung' | 'Nam';
 
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'EDITOR' | 'MODERATOR' | 'MEMBER' | 'GUEST';
+export type UserRole = 'super_admin' | 'admin' | 'editor' | 'viewer' | 'GUEST';
 
 export interface UserProfile {
   id: string;
-  email?: string;
+  email: string;
   displayName: string;
   avatarUrl?: string;
   bio?: string;
   province?: string;
   role: UserRole;
+  status: 'active' | 'suspended' | 'pending';
   is_protected_admin?: boolean;
   createdAt: string;
+  lastLoginAt?: string;
 }
 
 export type StoryCategory = 
@@ -52,6 +54,7 @@ export interface Story {
   sourceUrl: string; // URL nguồn gốc
   sourcePublishDate: string;
   author?: string;
+  authorName?: string; // Used in admin UI
   featured: boolean;
   status: 'published' | 'draft' | 'archived';
   views: number;
@@ -63,12 +66,14 @@ export interface Story {
   updatedBy?: string;
   updatedAt?: string;
   publishedAt?: string;
+  isDeleted?: boolean;
 }
 
 export interface StorySubmission {
   id: string;
   userId?: string;
   authorName: string;
+  authorEmail?: string; // Used in admin UI
   title: string;
   content: string;
   province: string;

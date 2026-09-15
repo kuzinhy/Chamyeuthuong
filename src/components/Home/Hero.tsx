@@ -114,8 +114,6 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate, onOpenLetterModal }) => 
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-600"></span>
               </span>
               <span className="text-slate-700">Không Gian Số Lan Tỏa Lòng Trắc Ẩn</span>
-              <span className="text-sky-300">•</span>
-              <span className="text-sky-600 font-bold">THPT Nguyễn Du</span>
             </div>
 
             {/* Main Title & Slogan with Tech Gradient */}
@@ -154,23 +152,6 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate, onOpenLetterModal }) => 
                 <span>GỬI HỘP THƯ YÊU THƯƠNG</span>
               </button>
             </div>
-
-            {/* High-Tech Trust Badges */}
-            <div className="pt-6 border-t border-slate-200/70 grid grid-cols-3 gap-4 max-w-md">
-              <div className="bg-white/60 backdrop-blur-sm p-2.5 rounded-xl border border-sky-100/70">
-                <div className="text-xl font-black text-slate-900 font-display">63</div>
-                <div className="text-[11px] text-slate-500 font-medium">Tỉnh thành kết nối</div>
-              </div>
-              <div className="bg-white/60 backdrop-blur-sm p-2.5 rounded-xl border border-sky-100/70">
-                <div className="text-xl font-black text-sky-600 font-display">100%</div>
-                <div className="text-[11px] text-slate-500 font-medium">Bảo mật & phi lợi nhuận</div>
-              </div>
-              <div className="bg-white/60 backdrop-blur-sm p-2.5 rounded-xl border border-sky-100/70">
-                <div className="text-xl font-black text-indigo-600 font-display">SPSS</div>
-                <div className="text-[11px] text-slate-500 font-medium">Nghiên cứu hành vi</div>
-              </div>
-            </div>
-
           </div>
 
           {/* RIGHT COLUMN: Interactive Mascot with Ambient Light Halo (5 cols) */}

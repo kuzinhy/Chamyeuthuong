@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Mail, 
   Plus, 
@@ -12,41 +12,20 @@ import {
   Clock, 
   ShieldCheck,
   Send,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { Letter, LetterCategory } from '../../types';
+import { storage } from '../../services/storage';
+import { useToast } from '../../context/ToastContext';
 
-interface AdminLettersTabProps {
-  letters: Letter[];
-  onApproveLetter: (id: string, reply?: string) => void;
-  onRejectLetter: (id: string) => void;
-  onDeleteLetter: (id: string) => void;
-  onAddLetter?: (letter: any) => void;
-  onUpdateLetter?: (id: string, updates: Partial<Letter>) => void;
-}
-
-const CATEGORIES: LetterCategory[] = [
-  'Cảm ơn',
-  'Xin lỗi',
-  'Động viên',
-  'Yêu thương',
-  'Lời chúc',
-  'Tâm sự',
-  'Gửi một người đặc biệt',
-  'Khác'
-];
-
-export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
-  letters,
-  onApproveLetter,
-  onRejectLetter,
-  onDeleteLetter,
-  onAddLetter,
-  onUpdateLetter
-}) => {
+export const AdminLettersTab: React.FC = () => {
+  const [letters, setLetters] = useState<Letter[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const { showToast } = useToast();
 
   // Reply modal
   const [replyLetter, setReplyLetter] = useState<Letter | null>(null);
@@ -61,18 +40,63 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
   const [formData, setFormData] = useState<Partial<Letter>>({
     senderName: '',
     targetPerson: '',
-    category: 'Tri ân',
+    category: 'Tri ân' as any,
     content: '',
     colorTheme: 'sky',
     isAnonymous: false,
     status: 'approved',
-    reply: ''
   });
 
-  const filteredLetters = letters.filter(l => {
+  useEffect(() => {
+    loadLetters();
+  }, []);
+
+  const loadLetters = async () => {
+    setLoading(true);
+    try {
+      const data = await storage.getLetters();
+      setLetters(data || []);
+    } catch (error) {
+      showToast('Không thể tải danh sách thư', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveLetter = async (id: string, reply?: string) => {
+    try {
+      await storage.updateLetterStatus(id, 'approved', reply);
+      showToast('Đã duyệt lá thư', 'success');
+      loadLetters();
+    } catch (error) {
+      showToast('Lỗi khi duyệt thư', 'error');
+    }
+  };
+
+  const handleRejectLetter = async (id: string) => {
+    try {
+      await storage.updateLetterStatus(id, 'rejected');
+      showToast('Đã từ chối lá thư', 'info');
+      loadLetters();
+    } catch (error) {
+      showToast('Lỗi khi từ chối thư', 'error');
+    }
+  };
+
+  const handleDeleteLetter = async (id: string) => {
+    try {
+      await storage.deleteLetter(id);
+      showToast('Đã xóa lá thư', 'success');
+      loadLetters();
+    } catch (error) {
+      showToast('Lỗi khi xóa thư', 'error');
+    }
+  };
+
+  const filteredLetters = (letters || []).filter(l => {
     const matchesSearch = 
-      l.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.senderName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (l.content || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (l.senderName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (l.targetPerson && l.targetPerson.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
     const matchesCategory = categoryFilter === 'all' || l.category === categoryFilter;
@@ -84,12 +108,11 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
     setFormData({
       senderName: 'Học sinh ẩn danh',
       targetPerson: 'Gửi người bạn cùng bàn',
-      category: 'Tri ân',
+      category: 'Cảm ơn',
       content: '',
       colorTheme: 'sky',
       isAnonymous: false,
       status: 'approved',
-      reply: 'LUMI trân trọng những dòng cảm xúc chân thành của bạn!'
     });
     setIsModalOpen(true);
   };
@@ -100,37 +123,53 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.content?.trim()) {
-      alert('Vui lòng nhập nội dung bức thư!');
+      showToast('Vui lòng nhập nội dung bức thư!', 'error');
       return;
     }
 
-    if (editingLetter && onUpdateLetter) {
-      onUpdateLetter(editingLetter.id, formData);
-    } else if (onAddLetter) {
-      onAddLetter({
-        ...formData,
-        id: `letter-${Date.now()}`,
-        date: new Date().toISOString().split('T')[0],
-        likes: 0
-      });
+    try {
+      if (editingLetter) {
+        await storage.updateLetterStatus(editingLetter.id, formData.status || 'approved', formData.replyFromLumi);
+      } else {
+        // Need a create method in storage for letters if we want to add from admin
+        // For now, let's just show a toast that this isn't implemented or add it to storage
+        showToast('Tính năng thêm thư trực tiếp đang được cập nhật', 'info');
+      }
+      setIsModalOpen(false);
+      loadLetters();
+    } catch (error) {
+      showToast('Lỗi khi lưu thư', 'error');
     }
-    setIsModalOpen(false);
   };
 
   const handleSendReply = () => {
     if (!replyLetter) return;
-    onApproveLetter(replyLetter.id, replyText);
+    handleApproveLetter(replyLetter.id, replyText);
     setReplyLetter(null);
     setReplyText('');
   };
 
-  const handleDelete = (id: string) => {
-    onDeleteLetter(id);
-    setDeleteConfirmId(null);
-  };
+  const CATEGORIES: LetterCategory[] = [
+    'Cảm ơn',
+    'Xin lỗi',
+    'Động viên',
+    'Yêu thương',
+    'Lời chúc',
+    'Tâm sự',
+    'Gửi một người đặc biệt',
+    'Khác'
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 text-sky-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -230,7 +269,7 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
                       <p className="text-[11px] text-slate-400">
                         Đến: {letter.targetPerson || 'Người bạn giấu tên'}
                       </p>
-                      <span className="text-[10px] text-slate-400">{letter.date}</span>
+                      <span className="text-[10px] text-slate-400">{letter.createdAt}</span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px] border border-rose-100">
@@ -241,9 +280,9 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
                       <p className="line-clamp-2 text-slate-700">{letter.content}</p>
                     </td>
                     <td className="px-4 py-3 max-w-xs">
-                      {letter.reply ? (
+                      {letter.replyFromLumi ? (
                         <p className="line-clamp-2 text-sky-700 bg-sky-50 p-1.5 rounded-lg text-[11px] border border-sky-100">
-                          {letter.reply}
+                          {letter.replyFromLumi}
                         </p>
                       ) : (
                         <span className="text-[11px] text-slate-400 italic">Chưa phản hồi</span>
@@ -267,7 +306,7 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
                     <td className="px-4 py-3 text-right space-x-1 whitespace-nowrap">
                       {letter.status !== 'approved' && (
                         <button
-                          onClick={() => onApproveLetter(letter.id)}
+                          onClick={() => handleApproveLetter(letter.id)}
                           title="Duyệt xuất bản nhanh"
                           className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
                         >
@@ -277,7 +316,7 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
                       <button
                         onClick={() => {
                           setReplyLetter(letter);
-                          setReplyText(letter.reply || '');
+                          setReplyText(letter.replyFromLumi || '');
                         }}
                         title="Viết lời hồi đáp từ LUMI"
                         className="p-1.5 text-sky-600 hover:bg-sky-50 rounded-lg transition-colors cursor-pointer"
@@ -380,7 +419,7 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
                 Hủy bỏ
               </button>
               <button
-                onClick={() => handleDelete(deleteConfirmId)}
+                onClick={() => handleDeleteLetter(deleteConfirmId)}
                 className="flex-1 py-2 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white cursor-pointer shadow-sm shadow-rose-600/30"
               >
                 Đồng ý xóa
@@ -473,8 +512,8 @@ export const AdminLettersTab: React.FC<AdminLettersTabProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={formData.reply || ''}
-                  onChange={(e) => setFormData({ ...formData, reply: e.target.value })}
+                  value={formData.replyFromLumi || ''}
+                  onChange={(e) => setFormData({ ...formData, replyFromLumi: e.target.value })}
                   className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
                 />
               </div>

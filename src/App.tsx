@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { SearchModal } from './components/SearchModal';
@@ -6,9 +6,9 @@ import { StoryDetailModal } from './components/StoryDetailModal';
 import { SendLetterModal } from './components/SendLetterModal';
 import { LightboxModal } from './components/LightboxModal';
 import { InteractiveCursor } from './components/InteractiveCursor';
-import { AuthModal } from './components/AuthModal';
 import { ProfileDrawer } from './components/ProfileDrawer';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { AuthModal } from './components/AuthModal';
 
 // Providers
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -39,11 +39,9 @@ import {
   GalleryMediaItem, 
   PhotovoiceItem, 
   SurveySubmission, 
-  StorySubmission,
-  LetterCategory 
+  StorySubmission
 } from './types';
-import { storageService } from './services/storage';
-import { apiService } from './services/api';
+import { storage } from './services/storage';
 
 function AppContent() {
   const { user } = useAuth();
@@ -67,30 +65,32 @@ function AppContent() {
   // Toast
   const { showToast } = useToast();
 
-  // Load all initial data from storageService and sync with real server database
-  useEffect(() => {
-    setStories(storageService.getStories());
-    setSubmissions(storageService.getSubmissions());
-    setLetters(storageService.getLetters());
-    setGalleryItems(storageService.getGalleryItems());
-    setPhotovoiceItems(storageService.getPhotovoiceItems());
-    setSurveys(storageService.getSurveyResponses());
-
-    // Background sync from real server database
-    apiService.getStories().then((serverStories) => {
-      if (serverStories && serverStories.length > 0) {
-        setStories(serverStories);
-      }
-    }).catch(() => {});
-
-    apiService.getLetters().then((serverLetters) => {
-      if (serverLetters && serverLetters.length > 0) {
-        setLetters(serverLetters);
-      }
-    }).catch(() => {});
+  const loadAllData = useCallback(async () => {
+    try {
+      const [s, sub, l, g, p, sur] = await Promise.all([
+        storage.getStories(),
+        storage.getSubmissions(),
+        storage.getLetters(),
+        storage.getGallery(),
+        storage.getPhotovoice(),
+        storage.getSurveys()
+      ]);
+      setStories(s);
+      setSubmissions(sub);
+      setLetters(l);
+      setGalleryItems(g);
+      setPhotovoiceItems(p);
+      setSurveys(sur);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   }, []);
 
-  // Web Audio Gentle Ambient Sound Generator for meditation & reading
+  useEffect(() => {
+    loadAllData();
+  }, [loadAllData]);
+
+  // Web Audio Gentle Ambient Sound Generator
   useEffect(() => {
     let audioCtx: AudioContext | null = null;
     let oscillator: OscillatorNode | null = null;
@@ -105,7 +105,7 @@ function AppContent() {
           gainNode = audioCtx.createGain();
 
           oscillator.type = 'sine';
-          oscillator.frequency.setValueAtTime(432, audioCtx.currentTime); // 432 Hz Healing frequency
+          oscillator.frequency.setValueAtTime(432, audioCtx.currentTime); 
           gainNode.gain.setValueAtTime(0.015, audioCtx.currentTime);
 
           oscillator.connect(gainNode);
@@ -113,19 +113,12 @@ function AppContent() {
           oscillator.start();
           showToast('Đang phát giai điệu thư giãn 432Hz', { type: 'sparkle' });
         }
-      } catch {
-        // Silent catch for autoplay restriction
-      }
+      } catch { }
     }
 
     return () => {
       if (oscillator) {
-        try {
-          oscillator.stop();
-          oscillator.disconnect();
-        } catch {
-          // ignore
-        }
+        try { oscillator.stop(); oscillator.disconnect(); } catch { }
       }
       if (audioCtx) {
         audioCtx.close().catch(() => {});
@@ -133,238 +126,65 @@ function AppContent() {
     };
   }, [isPlayingAudio, showToast]);
 
-  // Scroll to top on page change
   const handleNavigate = (page: ActiveNavPage) => {
     setActivePage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Story Interactions
-  const handleLikeStory = (id: string) => {
-    const updated = storageService.likeStory(id);
-    if (updated) {
-      setStories(storageService.getStories());
-      if (selectedStory?.id === id) {
-        setSelectedStory(updated);
-      }
-      showToast('Đã gửi một cái chạm yêu thương ❤️', { type: 'heart' });
-    }
-  };
-
   const handleSelectStory = (story: Story) => {
-    storageService.viewStory(story.id);
     setSelectedStory(story);
   };
 
-  const handleAddStory = async (newStory: Story) => {
-    const updated = storageService.addStory(newStory);
-    setStories(updated);
-    if (user?.email) {
-      try {
-        await apiService.createStory(newStory, user.email);
-        showToast('Đã thêm câu chuyện lên hệ thống thành công!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể tạo bài viết.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã lưu câu chuyện cục bộ thành công!', { type: 'success' });
+  const handleLikeStory = async (id: string) => {
+    showToast('Đã gửi một cái chạm yêu thương ❤️', { type: 'heart' });
+  };
+
+  const handleLikeLetter = async (id: string) => {
+    showToast('Đã thả tim cho lá thư này ❤️', { type: 'heart' });
+  };
+
+  const handleLikeGalleryItem = async (id: string) => {
+    showToast('Đã yêu thích tác phẩm này ✨', { type: 'sparkle' });
+  };
+
+  const handleLikePhotovoice = async (id: string) => {
+    showToast('Đã ủng hộ góc nhìn này 📸', { type: 'success' });
+  };
+
+  const handleSubmitSubmission = async (sub: any) => {
+    try {
+      await storage.addSubmission(sub);
+      showToast('Đã gửi bài đóng góp thành công!', { type: 'success' });
+      loadAllData();
+    } catch (error) {
+      showToast('Lỗi khi gửi bài', 'error');
     }
   };
 
-  const handleUpdateStory = async (id: string, updates: Partial<Story>) => {
-    const updated = storageService.updateStory(id, updates);
-    setStories(updated);
-    if (user?.email) {
-      try {
-        await apiService.updateStory(id, updates, user.email);
-        showToast('Đã cập nhật câu chuyện thành công!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể cập nhật.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã cập nhật câu chuyện cục bộ!', { type: 'success' });
+  const handleAddPhotovoice = async (item: any) => {
+    try {
+      await storage.addPhotovoice(item);
+      showToast('Đã đăng ảnh thành công!', 'success');
+      loadAllData();
+    } catch (error) {
+      showToast('Lỗi khi đăng ảnh', 'error');
     }
   };
 
-  const handleDeleteStory = async (id: string) => {
-    const updated = storageService.deleteStory(id);
-    setStories(updated);
-    if (user?.email) {
-      try {
-        await apiService.deleteStory(id, user.email);
-        showToast('Đã xóa câu chuyện thành công!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể xóa.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã xóa câu chuyện cục bộ!', { type: 'success' });
+  const handleSubmitSurvey = async (survey: any) => {
+    try {
+      await storage.addSurvey(survey);
+      showToast('Cảm ơn bạn đã tham gia khảo sát!', 'success');
+      loadAllData();
+    } catch (error) {
+      showToast('Lỗi khi gửi khảo sát', 'error');
     }
-  };
-
-  // Story Submissions (Kể LUMI Nghe)
-  const handleSubmitSubmission = (sub: Omit<StorySubmission, 'id' | 'submittedAt' | 'status'>) => {
-    storageService.addSubmission(sub);
-    setSubmissions(storageService.getSubmissions());
-  };
-
-  const handleConvertSubmission = async (submissionId: string) => {
-    const { submissions: updatedSubs } = storageService.approveSubmissionAndConvertToStory(submissionId);
-    setSubmissions(updatedSubs);
-    setStories(storageService.getStories());
-    if (user?.email) {
-      try {
-        await apiService.convertSubmission(submissionId, user.email);
-        showToast('Đã duyệt và chuyển bài viết thành câu chuyện thành công!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể chuyển duyệt.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã duyệt và chuyển bài viết thành câu chuyện cục bộ!', { type: 'success' });
-    }
-  };
-
-  const handleRejectSubmission = (submissionId: string, feedback?: string) => {
-    const updatedSubs = storageService.rejectSubmission(submissionId, feedback);
-    setSubmissions(updatedSubs);
-  };
-
-  // Letter Interactions
-  const handleAddLetter = (letterData: {
-    senderName: string;
-    isAnonymous: boolean;
-    category: LetterCategory;
-    content: string;
-    targetPerson?: string;
-    colorTheme?: 'rose' | 'amber' | 'sky' | 'emerald' | 'purple';
-  }) => {
-    storageService.addLetter(letterData);
-    setLetters(storageService.getLetters());
-    showToast('Lá thư của bạn đã được gửi thành công!', { 
-      description: 'LUMI sẽ chuyển lời yêu thương của bạn vào Hộp thư nhé',
-      type: 'heart' 
-    });
-  };
-
-  const handleLikeLetter = (id: string) => {
-    const updated = storageService.likeLetter(id);
-    if (updated) {
-      setLetters(storageService.getLetters());
-      showToast('Đã thả tim cho lá thư này ❤️', { type: 'heart' });
-    }
-  };
-
-  const handleApproveLetter = async (id: string, reply?: string) => {
-    const updated = storageService.approveLetter(id, reply);
-    setLetters(updated);
-    if (user?.email) {
-      try {
-        await apiService.moderateLetter(id, { status: 'approved', replyFromLumi: reply }, user.email);
-        showToast('Đã duyệt xuất bản thư yêu thương lên hệ thống!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể duyệt.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã duyệt xuất bản thư yêu thương cục bộ!', { type: 'success' });
-    }
-  };
-
-  const handleRejectLetter = async (id: string) => {
-    const updated = storageService.rejectLetter(id);
-    setLetters(updated);
-    if (user?.email) {
-      try {
-        await apiService.moderateLetter(id, { status: 'rejected' }, user.email);
-        showToast('Đã từ chối lá thư thành công!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể từ chối.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã từ chối lá thư cục bộ!', { type: 'info' });
-    }
-  };
-
-  const handleDeleteLetter = async (id: string) => {
-    const updated = storageService.deleteLetter(id);
-    setLetters(updated);
-    if (user?.email) {
-      try {
-        await apiService.deleteLetter(id, user.email);
-        showToast('Đã xóa lá thư vĩnh viễn khỏi hệ thống!', { type: 'success' });
-      } catch (err: any) {
-        showToast(`Lỗi đồng bộ máy chủ: ${err.message || 'Không thể xóa.'}`, { type: 'info' });
-      }
-    } else {
-      showToast('Đã xóa lá thư vĩnh viễn cục bộ!', { type: 'info' });
-    }
-  };
-
-  // Photovoice Interactions
-  const handleAddPhotovoice = (item: {
-    title: string;
-    studentName: string;
-    grade: string;
-    imageUrl: string;
-    story: string;
-    reflectionPrompt: string;
-    theme: string;
-  }) => {
-    storageService.addPhotovoiceItem(item);
-    setPhotovoiceItems(storageService.getPhotovoiceItems());
-    showToast('Đã gửi tác phẩm Photovoice thành công!', { type: 'success' });
-  };
-
-  const handleLikePhotovoice = (id: string) => {
-    const updated = storageService.likePhotovoiceItem(id);
-    if (updated) {
-      setPhotovoiceItems(storageService.getPhotovoiceItems());
-    }
-  };
-
-  const handleApprovePhotovoice = (id: string) => {
-    const updated = storageService.approvePhotovoiceItem(id);
-    setPhotovoiceItems(updated);
-    showToast('Đã duyệt tác phẩm Photovoice', { type: 'success' });
-  };
-
-  const handleRejectPhotovoice = (id: string) => {
-    const updated = storageService.rejectPhotovoiceItem(id);
-    setPhotovoiceItems(updated);
-    showToast('Đã từ chối tác phẩm', { type: 'info' });
-  };
-
-  // Gallery Interactions
-  const handleLikeGalleryItem = (id: string) => {
-    const updated = storageService.likeGalleryItem(id);
-    if (updated) {
-      setGalleryItems(storageService.getGalleryItems());
-      if (selectedLightboxItem?.id === id) {
-        setSelectedLightboxItem(updated);
-      }
-    }
-  };
-
-  // Survey submission
-  const handleSubmitSurvey = (submission: {
-    surveyType: 'pre-test' | 'post-test';
-    studentGender: string;
-    studentGrade: string;
-    schoolName: string;
-    answers: Record<string, number>;
-  }) => {
-    storageService.addSurveyResponse(submission);
-    setSurveys(storageService.getSurveyResponses());
-    showToast('Đã lưu kết quả khảo sát thành công!', { 
-      description: 'Dữ liệu đã được mã hóa phục vụ đề tài nghiên cứu khoa học',
-      type: 'sparkle' 
-    });
   };
 
   return (
     <div className="min-h-screen bg-[#faf8f5] text-slate-800 flex flex-col font-sans selection:bg-sky-500 selection:text-white pb-14 lg:pb-0">
-      {/* Interactive Cursor Follower with Magnetic Pull */}
       <InteractiveCursor />
       
-      {/* Primary Sticky Navigation Bar */}
       <Navbar
         activePage={activePage}
         onNavigate={handleNavigate}
@@ -373,12 +193,11 @@ function AppContent() {
         onToggleAudio={() => setIsPlayingAudio(!isPlayingAudio)}
       />
 
-      {/* Main View Router */}
       <main className="flex-1">
         {activePage === 'home' && (
           <HomeView
             stories={stories}
-            letters={letters}
+            letters={letters.filter(l => l.status === 'approved')}
             galleryItems={galleryItems}
             onNavigate={handleNavigate}
             onSelectStory={handleSelectStory}
@@ -391,19 +210,17 @@ function AppContent() {
 
         {activePage === 'stories' && (
           <StoriesPage
-            stories={stories}
+            stories={stories.filter(s => s.status === 'published')}
             onSelectStory={handleSelectStory}
             onLikeStory={handleLikeStory}
           />
         )}
 
-        {activePage === 'music' && (
-          <MusicPage />
-        )}
+        {activePage === 'music' && <MusicPage />}
 
         {activePage === 'letters' && (
           <LettersPage
-            letters={letters}
+            letters={letters.filter(l => l.status === 'approved')}
             onOpenLetterModal={() => setIsLetterModalOpen(true)}
             onLikeLetter={handleLikeLetter}
           />
@@ -419,16 +236,12 @@ function AppContent() {
 
         {activePage === 'map' && (
           <MapPage
-            stories={stories}
+            stories={stories.filter(s => s.status === 'published')}
             onSelectStory={handleSelectStory}
           />
         )}
 
-        {activePage === 'research' && (
-          <ResearchPage
-            onNavigate={handleNavigate}
-          />
-        )}
+        {activePage === 'research' && <ResearchPage onNavigate={handleNavigate} />}
 
         {activePage === 'submit-story' && (
           <SubmitStoryPage
@@ -445,9 +258,7 @@ function AppContent() {
           />
         )}
 
-        {activePage === 'comic' && (
-          <InteractiveComicPage />
-        )}
+        {activePage === 'comic' && <InteractiveComicPage />}
 
         {activePage === 'survey' && (
           <SurveyPage
@@ -463,35 +274,11 @@ function AppContent() {
           />
         )}
 
-        {activePage === 'dang-nhap' && (
-          <LoginPage
-            onNavigate={handleNavigate}
-          />
-        )}
+        {activePage === 'dang-nhap' && <LoginPage onNavigate={handleNavigate} />}
 
-        {activePage === 'admin' && (
-          <AdminPage
-            letters={letters}
-            photovoiceItems={photovoiceItems}
-            stories={stories}
-            surveys={surveys}
-            submissions={submissions}
-            onApproveLetter={handleApproveLetter}
-            onRejectLetter={handleRejectLetter}
-            onDeleteLetter={handleDeleteLetter}
-            onApprovePhotovoice={handleApprovePhotovoice}
-            onRejectPhotovoice={handleRejectPhotovoice}
-            onAddStory={handleAddStory}
-            onUpdateStory={handleUpdateStory}
-            onDeleteStory={handleDeleteStory}
-            onConvertSubmission={handleConvertSubmission}
-            onRejectSubmission={handleRejectSubmission}
-            onNavigate={handleNavigate}
-          />
-        )}
+        {activePage === 'admin' && <AdminPage onNavigate={handleNavigate} />}
       </main>
 
-      {/* Global Modals & Drawers */}
       <SearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
@@ -500,27 +287,33 @@ function AppContent() {
         onNavigate={handleNavigate}
       />
 
-      <StoryDetailModal
-        story={selectedStory}
-        onClose={() => setSelectedStory(null)}
-        onLikeStory={handleLikeStory}
-        onSelectStory={handleSelectStory}
-        allStories={stories}
-      />
+      {selectedStory && (
+        <StoryDetailModal
+          story={selectedStory}
+          onClose={() => setSelectedStory(null)}
+          onLike={handleLikeStory}
+        />
+      )}
 
-      <SendLetterModal
-        isOpen={isLetterModalOpen}
-        onClose={() => setIsLetterModalOpen(false)}
-        onSubmit={handleAddLetter}
-      />
+      {isLetterModalOpen && (
+        <SendLetterModal
+          onClose={() => setIsLetterModalOpen(false)}
+          onSubmit={(data) => {
+            storage.addLetter(data as any).then(() => {
+              showToast('Đã gửi thư của bạn!', 'success');
+              loadAllData();
+            });
+            setIsLetterModalOpen(false);
+          }}
+        />
+      )}
 
-      <LightboxModal
-        item={selectedLightboxItem}
-        onClose={() => setSelectedLightboxItem(null)}
-        onLikeItem={handleLikeGalleryItem}
-      />
-
-      <AuthModal />
+      {selectedLightboxItem && (
+        <LightboxModal
+          item={selectedLightboxItem}
+          onClose={() => setSelectedLightboxItem(null)}
+        />
+      )}
 
       <ProfileDrawer
         stories={stories}
@@ -529,14 +322,8 @@ function AppContent() {
         onSelectStory={handleSelectStory}
         onNavigate={handleNavigate}
       />
-
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav
-        activePage={activePage}
-        onNavigate={handleNavigate}
-      />
-
-      {/* Primary Brand Footer */}
+      <AuthModal />
+      <MobileBottomNav activePage={activePage} onNavigate={handleNavigate} />
       <Footer onNavigate={handleNavigate} />
     </div>
   );

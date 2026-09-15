@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MapPin, 
   Plus, 
@@ -10,28 +10,36 @@ import {
   X, 
   Layers, 
   ExternalLink,
-  BookOpen
+  BookOpen,
+  RefreshCw
 } from 'lucide-react';
 import { KindnessPoint, RegionType } from '../../types';
 import { vietnameseProvinces } from '../../data/provincesData';
+import { storage } from '../../services/storage';
+import { useToast } from '../../context/ToastContext';
 
-interface AdminMapTabProps {
-  points: KindnessPoint[];
-  onAddPoint: (point: Partial<KindnessPoint>) => void;
-  onUpdatePoint: (id: string, updates: Partial<KindnessPoint>) => void;
-  onDeletePoint: (id: string) => void;
-  onNavigateToMap?: () => void;
-}
-
-export const AdminMapTab: React.FC<AdminMapTabProps> = ({
-  points,
-  onAddPoint,
-  onUpdatePoint,
-  onDeletePoint,
-  onNavigateToMap
-}) => {
+export const AdminMapTab: React.FC = () => {
+  const [points, setPoints] = useState<KindnessPoint[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    loadPoints();
+  }, []);
+
+  const loadPoints = async () => {
+    setLoading(true);
+    try {
+      const data = await storage.getMapPoints();
+      setPoints(data || []);
+    } catch (error) {
+      showToast('Không thể tải danh sách điểm tử tế', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -51,10 +59,10 @@ export const AdminMapTab: React.FC<AdminMapTabProps> = ({
     storyCount: 1
   });
 
-  const filteredPoints = points.filter(p => {
+  const filteredPoints = (points || []).filter(p => {
     const matchesSearch = 
-      p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.province.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.province || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.address && p.address.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesRegion = selectedRegion === 'all' || p.region === selectedRegion;
     return matchesSearch && matchesRegion;
@@ -82,25 +90,46 @@ export const AdminMapTab: React.FC<AdminMapTabProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title?.trim() || !formData.province?.trim()) {
-      alert('Vui lòng nhập tên điểm tử tế và chọn tỉnh thành!');
+      showToast('Vui lòng nhập tên điểm tử tế và chọn tỉnh thành!', 'error');
       return;
     }
 
-    if (editingPoint) {
-      onUpdatePoint(editingPoint.id, formData);
-    } else {
-      onAddPoint(formData);
+    try {
+      if (editingPoint) {
+        await storage.updateMapPoint(editingPoint.id, formData);
+        showToast('Đã cập nhật điểm tử tế', 'success');
+      } else {
+        await storage.addMapPoint(formData as any);
+        showToast('Đã thêm điểm tử tế mới', 'success');
+      }
+      setIsModalOpen(false);
+      loadPoints();
+    } catch (error) {
+      showToast('Lỗi khi lưu điểm tử tế', 'error');
     }
-    setIsModalOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    onDeletePoint(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await storage.deleteMapPoint(id);
+      showToast('Đã xóa điểm tử tế', 'success');
+      loadPoints();
+    } catch (error) {
+      showToast('Lỗi khi xóa điểm tử tế', 'error');
+    }
     setDeleteConfirmId(null);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-8 h-8 text-sky-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -120,16 +149,6 @@ export const AdminMapTab: React.FC<AdminMapTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          {onNavigateToMap && (
-            <button
-              onClick={onNavigateToMap}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Xem Bản Đồ Web</span>
-            </button>
-          )}
-
           <button
             onClick={handleOpenAdd}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-sky-500/20 transition-all cursor-pointer flex-shrink-0"
@@ -212,7 +231,7 @@ export const AdminMapTab: React.FC<AdminMapTabProps> = ({
                     <td className="px-4 py-3 text-slate-600">
                       <p className="line-clamp-1">{point.address || 'Trung tâm tỉnh/thành'}</p>
                       <p className="text-[10px] text-slate-400 font-mono">
-                        {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)}
+                        {(point.latitude || 0).toFixed(4)}, {(point.longitude || 0).toFixed(4)}
                       </p>
                     </td>
                     <td className="px-4 py-3">

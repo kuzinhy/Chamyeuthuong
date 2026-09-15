@@ -1,0 +1,143 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with role-based access control",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["super_admin", "admin", "editor", "viewer"] },
+        "status": { "type": "string", "enum": ["active", "suspended", "pending"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastLoginAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "status"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "Articles, stories, or news items",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "excerpt": { "type": "string", "maxLength": 500 },
+        "content": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "images": { "type": "array" },
+        "categoryId": { "type": "string" },
+        "tags": { "type": "array" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "status": { "type": "string", "enum": ["draft", "pending", "published", "hidden", "archived"] },
+        "featured": { "type": "boolean" },
+        "pinned": { "type": "boolean" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "seoTitle": { "type": "string", "maxLength": 70 },
+        "seoDescription": { "type": "string", "maxLength": 160 },
+        "seoKeywords": { "type": "string" },
+        "views": { "type": "number" },
+        "isDeleted": { "type": "boolean" },
+        "deletedAt": { "type": "string", "format": "date-time" },
+        "deletedBy": { "type": "string" }
+      },
+      "required": ["title", "slug", "status", "authorId"]
+    },
+    "Homepage": {
+      "title": "Homepage Configuration",
+      "description": "Settings for homepage sections",
+      "type": "object",
+      "properties": {
+        "sections": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      }
+    },
+    "SiteSettings": {
+      "title": "Site Settings",
+      "description": "Global configuration and contact info",
+      "type": "object",
+      "properties": {
+        "contact": { "type": "object" },
+        "system": { "type": "object" },
+        "seo": { "type": "object" },
+        "footer": { "type": "object" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Menu": {
+      "title": "Menu Item",
+      "description": "Navigation menu link",
+      "type": "object",
+      "properties": {
+        "label": { "type": "string" },
+        "url": { "type": "string" },
+        "parentId": { "type": "string" },
+        "order": { "type": "number" },
+        "visible": { "type": "boolean" },
+        "openInNewTab": { "type": "boolean" }
+      },
+      "required": ["label", "url", "order"]
+    },
+    "Media": {
+      "title": "Media Asset",
+      "description": "Metadata for uploaded files",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "type": { "type": "string" },
+        "size": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "uploadedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "url", "storagePath"]
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "Record of administrative actions",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "action": { "type": "string" },
+        "module": { "type": "string" },
+        "documentId": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "action", "module", "createdAt"]
+    },
+    "Revision": {
+      "title": "Content Revision",
+      "description": "History of content changes",
+      "type": "object",
+      "properties": {
+        "collection": { "type": "string" },
+        "documentId": { "type": "string" },
+        "snapshot": { "type": "object" },
+        "editedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["collection", "documentId", "snapshot", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": { "schema": "User", "description": "User profiles and roles" },
+    "/posts/{postId}": { "schema": "Post", "description": "Articles and stories" },
+    "/homepage/config": { "schema": "Homepage", "description": "Homepage layout settings" },
+    "/siteSettings/{settingId}": { "schema": "SiteSettings", "description": "Global settings docs" },
+    "/menus/{menuId}": { "schema": "Menu", "description": "Navigation menu items" },
+    "/media/{mediaId}": { "schema": "Media", "description": "Media library assets" },
+    "/auditLogs/{logId}": { "schema": "AuditLog", "description": "Admin activity logs" },
+    "/revisions/{revisionId}": { "schema": "Revision", "description": "Content history" }
+  }
+}

@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole, UserNotification } from '../types';
-import { apiService, supabase } from '../services/api';
-import { normalizeEmail } from '../utils/adminAuth';
-import { signInWithFirebaseGoogle, signOutFirebase } from '../lib/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { auth, signInWithFirebaseGoogle, signOutFirebase } from '../lib/firebase';
+import { userService } from '../services/userService';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -10,6 +10,8 @@ interface AuthContextType {
   isLoggedIn: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isEditor: boolean;
+  loading: boolean;
   savedStoryIds: string[];
   toggleBookmark: (storyId: string) => boolean;
   isStoryBookmarked: (storyId: string) => boolean;
@@ -17,19 +19,20 @@ interface AuthContextType {
   unreadNotificationCount: number;
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
-  loginWithGoogle: (customEmail?: string, customName?: string) => Promise<{ role: string; redirectUrl: string }>;
-  loginWithFirebasePopup: () => Promise<{ role: string; redirectUrl: string }>;
+  loginWithFirebasePopup: () => Promise<UserProfile>;
+  loginWithGoogle: (email?: string) => Promise<UserProfile>;
   logout: () => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
   isProfileDrawerOpen: boolean;
-  openProfileDrawer: () => void;
+  profileDrawerTab: 'bookmarks' | 'submissions' | 'letters' | 'notifications';
+  setProfileDrawerTab: (tab: 'bookmarks' | 'submissions' | 'letters' | 'notifications') => void;
+  openProfileDrawer: (initialTab?: 'bookmarks' | 'submissions' | 'letters' | 'notifications') => void;
   closeProfileDrawer: () => void;
 }
 
-const AUTH_STORAGE_KEY = 'lumi_auth_session_v4';
 const BOOKMARKS_STORAGE_KEY = 'lumi_bookmarks_v4';
 const NOTIFICATIONS_STORAGE_KEY = 'lumi_notifications_v4';
 
@@ -43,39 +46,24 @@ const initialNotifications: UserNotification[] = [
     targetUrl: '/ve-du-an',
     isRead: false,
     createdAt: 'Hôm nay'
-  },
-  {
-    id: 'notif-2',
-    userId: 'system',
-    type: 'new_story',
-    title: 'Câu chuyện tử tế mới',
-    message: 'LUMI vừa cập nhật câu chuyện đẹp về học sinh nhặt được tài sản trao trả người đánh rơi.',
-    targetUrl: '/cau-chuyen',
-    isRead: false,
-    createdAt: 'Hôm qua'
   }
 ];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Notice: user starts with saved session or null (chưa đăng nhập tài khoản khi truy cập mới)
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
-      return null; // Fresh access: unauthenticated by default
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
+  const [profileDrawerTab, setProfileDrawerTab] = useState<'bookmarks' | 'submissions' | 'letters' | 'notifications'>('bookmarks');
 
   const [savedStoryIds, setSavedStoryIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(BOOKMARKS_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : ['story-1', 'story-3'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      return ['story-1', 'story-3'];
+      return [];
     }
   });
 
@@ -88,17 +76,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isProfileDrawerOpen, setIsProfileDrawerOpen] = useState(false);
-
-  // Sync to localStorage
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
-  }, [user]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
+        try {
+          // Fetch or create profile
+          let profile = await userService.getProfile(firebaseUser.uid);
+          
+          if (!profile) {
+            // Check if this is the bootstrapped admin email
+            const isBootstrappedAdmin = firebaseUser.email === 'nguyenhuy.thudaumot@gmail.com';
+            
+            profile = await userService.createProfile(firebaseUser.uid, {
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || 'Người dùng LUMI',
+              avatarUrl: firebaseUser.photoURL || '',
+              role: isBootstrappedAdmin ? 'super_admin' : 'viewer',
+              status: 'active'
+            });
+          } else {
+            await userService.updateLastLogin(firebaseUser.uid);
+          }
+          
+          setUser(profile);
+        } catch (error) {
+          console.error('Error syncing user profile:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(savedStoryIds));
@@ -108,11 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
   }, [notifications]);
 
-  // Derive role strictly from user.role given by server
-  const role: UserRole = user ? (user.role as UserRole) : 'GUEST';
-  const isLoggedIn = !!user && role !== 'GUEST';
-  const isSuperAdmin = role === 'SUPER_ADMIN';
-  const isAdmin = role === 'SUPER_ADMIN' || role === 'ADMIN';
+  const role: UserRole = user ? user.role : 'GUEST';
+  const isLoggedIn = !!user;
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'super_admin' || role === 'admin';
+  const isEditor = role === 'super_admin' || role === 'admin' || role === 'editor';
 
   const toggleBookmark = (storyId: string): boolean => {
     if (!storyId) return false;
@@ -141,80 +154,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
-  // Google Authentication: passes through server /api/auth/google-login
-  const loginWithGoogle = async (customEmail?: string, customName?: string): Promise<{ role: string; redirectUrl: string }> => {
-    const targetEmail = normalizeEmail(customEmail || 'nguyenhuy.thudaumot@gmail.com');
-    
-    // If Supabase OAuth is configured, initiate Supabase Google OAuth
-    if (supabase && !customEmail) {
-      try {
-        await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: `${window.location.origin}/auth/callback` }
+  const loginWithFirebasePopup = async (): Promise<UserProfile> => {
+    try {
+      const { firebaseUser } = await signInWithFirebaseGoogle();
+      setIsAuthModalOpen(false);
+
+      // Immediately fetch or create profile so we can return it to the caller
+      let profile = await userService.getProfile(firebaseUser.uid);
+      
+      if (!profile) {
+        const isBootstrappedAdmin = firebaseUser.email === 'nguyenhuy.thudaumot@gmail.com';
+        profile = await userService.createProfile(firebaseUser.uid, {
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || 'Người dùng LUMI',
+          avatarUrl: firebaseUser.photoURL || '',
+          role: isBootstrappedAdmin ? 'super_admin' : 'viewer',
+          status: 'active'
         });
-      } catch (e) {
-        console.warn('Supabase OAuth fallback to server auth:', e);
       }
-    }
-
-    try {
-      const response = await apiService.loginWithGoogle(
-        targetEmail,
-        customName,
-        targetEmail.includes('hoanghuutrung')
-          ? 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=300&q=80'
-          : targetEmail.includes('nguyenhuy')
-          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'
-          : 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=300&q=80'
-      );
-
-      setUser(response.user);
-      setIsAuthModalOpen(false);
-      return { role: response.role, redirectUrl: response.redirectUrl };
-    } catch (err: any) {
-      console.warn('API login warning, falling back to direct auth session:', err);
-      const isSuper = targetEmail.includes('nguyenhuy') || targetEmail.includes('hoanghuutrung');
-      const fallbackUser: UserProfile = {
-        id: `usr-${Date.now()}`,
-        email: targetEmail,
-        displayName: customName || targetEmail.split('@')[0],
-        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
-        role: isSuper ? 'SUPER_ADMIN' : 'MEMBER',
-        is_protected_admin: isSuper,
-        createdAt: new Date().toISOString()
-      };
-      setUser(fallbackUser);
-      setIsAuthModalOpen(false);
-      return { role: fallbackUser.role, redirectUrl: isSuper ? '/admin' : '/' };
-    }
-  };
-
-  // Firebase Google Popup Authentication
-  const loginWithFirebasePopup = async (): Promise<{ role: string; redirectUrl: string }> => {
-    try {
-      const fbResult = await signInWithFirebaseGoogle();
-      if (!fbResult.email) {
-        throw new Error('Không lấy được email từ tài khoản Google.');
-      }
-      return await loginWithGoogle(fbResult.email, fbResult.displayName);
+      
+      return profile;
     } catch (err: any) {
       console.error('Firebase login error:', err);
       throw err;
     }
   };
 
-  const logout = () => {
-    if (supabase) {
-      supabase.auth.signOut().catch(() => {});
+  const loginWithGoogle = async (email?: string): Promise<UserProfile> => {
+    if (email && email.trim()) {
+      const cleanEmail = email.trim().toLowerCase();
+      const mockUid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      let profile = await userService.getProfile(mockUid);
+      if (!profile) {
+        const isBootstrappedAdmin = cleanEmail === 'nguyenhuy.thudaumot@gmail.com';
+        profile = await userService.createProfile(mockUid, {
+          email: cleanEmail,
+          displayName: cleanEmail.split('@')[0],
+          avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanEmail}`,
+          role: isBootstrappedAdmin ? 'super_admin' : 'viewer',
+          status: 'active'
+        });
+      } else {
+        await userService.updateLastLogin(mockUid);
+      }
+      setUser(profile);
+      setIsAuthModalOpen(false);
+      return profile;
     }
-    signOutFirebase().catch(() => {});
-    setUser(null);
-    setIsProfileDrawerOpen(false);
+    return loginWithFirebasePopup();
+  };
+
+  const logout = async () => {
+    try {
+      await signOutFirebase();
+      setUser(null);
+      setIsProfileDrawerOpen(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const updateProfile = (updates: Partial<UserProfile>) => {
     if (!user) return;
     setUser(prev => prev ? { ...prev, ...updates } : null);
+    userService.updateLastLogin(user.id); 
   };
 
   const unreadNotificationCount = notifications.filter(n => !n.isRead).length;
@@ -227,6 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoggedIn,
         isAdmin,
         isSuperAdmin,
+        isEditor,
+        loading,
         savedStoryIds,
         toggleBookmark,
         isStoryBookmarked,
@@ -234,19 +239,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         unreadNotificationCount,
         markNotificationAsRead,
         markAllNotificationsAsRead,
-        loginWithGoogle,
         loginWithFirebasePopup,
+        loginWithGoogle,
         logout,
         updateProfile,
         isAuthModalOpen,
         openAuthModal: () => setIsAuthModalOpen(true),
         closeAuthModal: () => setIsAuthModalOpen(false),
         isProfileDrawerOpen,
-        openProfileDrawer: () => setIsProfileDrawerOpen(true),
+        profileDrawerTab,
+        setProfileDrawerTab,
+        openProfileDrawer: (initialTab?: 'bookmarks' | 'submissions' | 'letters' | 'notifications') => {
+          if (initialTab) {
+            setProfileDrawerTab(initialTab);
+          }
+          setIsProfileDrawerOpen(true);
+        },
         closeProfileDrawer: () => setIsProfileDrawerOpen(false),
       }}
     >
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }

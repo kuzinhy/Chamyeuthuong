@@ -1,19 +1,14 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-
-export const firebaseConfig = {
-  apiKey: "AIzaSyDNb_Z90crRIUoNPy_B7IRbs1ur7xphh9w",
-  authDomain: "chamyeuthuong-7db8d.firebaseapp.com",
-  projectId: "chamyeuthuong-7db8d",
-  storageBucket: "chamyeuthuong-7db8d.firebasestorage.app",
-  messagingSenderId: "136118859620",
-  appId: "1:136118859620:web:2c09bfbed3ff00767fac71",
-  measurementId: "G-QF489ZNNNB"
-};
+import { getStorage } from 'firebase/storage';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App safely (singleton instance)
 export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// Initialize Cloud Firestore with databaseId from config
+export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
 // Initialize Firebase Authentication
 export const auth = getAuth(firebaseApp);
@@ -22,8 +17,8 @@ googleAuthProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-// Initialize Cloud Firestore
-export const db = getFirestore(firebaseApp);
+// Initialize Firebase Storage
+export const storage = getStorage(firebaseApp);
 
 /**
  * Sign in with Google Popup using Firebase Authentication
