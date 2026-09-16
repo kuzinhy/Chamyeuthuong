@@ -128,6 +128,127 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["collection", "documentId", "snapshot", "createdAt"]
+    },
+    "GalleryMedia": {
+      "title": "Gallery Media Item",
+      "description": "Media items in the creative gallery",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "date": { "type": "string" },
+        "credit": { "type": "string" },
+        "source": { "type": "string" },
+        "likes": { "type": "number" },
+        "tags": { "type": "array" }
+      },
+      "required": ["title", "category", "imageUrl"]
+    },
+    "Photovoice": {
+      "title": "Photovoice Item",
+      "description": "Photovoice community submissions",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorGrade": { "type": "string" },
+        "school": { "type": "string" },
+        "storyText": { "type": "string" },
+        "reflectionPrompt": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "likes": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      },
+      "required": ["title", "imageUrl", "authorName", "storyText", "status"]
+    },
+    "Letter": {
+      "title": "Letter Item",
+      "description": "Empathy and kindness letters",
+      "type": "object",
+      "properties": {
+        "senderName": { "type": "string" },
+        "senderSchool": { "type": "string" },
+        "recipient": { "type": "string" },
+        "content": { "type": "string" },
+        "theme": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "replyFromLumi": { "type": "string" },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["senderName", "content", "status"]
+    },
+    "Survey": {
+      "title": "Psychology Survey Submission",
+      "description": "Student emotional and psychology survey responses",
+      "type": "object",
+      "properties": {
+        "answers": { "type": "object" },
+        "score": { "type": "number" },
+        "feedback": { "type": "string" },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["answers", "submittedAt"]
+    },
+    "Submission": {
+      "title": "Story Submission",
+      "description": "User submitted kindness stories",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorEmail": { "type": "string" },
+        "school": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["title", "content", "authorName", "status"]
+    },
+    "Song": {
+      "title": "Song Track",
+      "description": "Community audio track",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "artist": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["title", "audioUrl"]
+    },
+    "KindnessPoint": {
+      "title": "Kindness Map Point",
+      "description": "Kindness acts on the interactive map",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "object" },
+        "school": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["title", "category", "location"]
+    },
+    "Research": {
+      "title": "Research Publication",
+      "description": "Psychological and educational research papers",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "authors": { "type": "string" },
+        "year": { "type": "number" },
+        "abstract": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["title", "authors", "abstract"]
     }
   },
   "firestore": {
@@ -138,6 +259,14 @@
     "/menus/{menuId}": { "schema": "Menu", "description": "Navigation menu items" },
     "/media/{mediaId}": { "schema": "Media", "description": "Media library assets" },
     "/auditLogs/{logId}": { "schema": "AuditLog", "description": "Admin activity logs" },
-    "/revisions/{revisionId}": { "schema": "Revision", "description": "Content history" }
+    "/revisions/{revisionId}": { "schema": "Revision", "description": "Content history" },
+    "/gallery/{itemId}": { "schema": "GalleryMedia", "description": "Creative gallery items" },
+    "/photovoice/{itemId}": { "schema": "Photovoice", "description": "Photovoice submissions" },
+    "/letters/{letterId}": { "schema": "Letter", "description": "Kindness letters" },
+    "/surveys/{surveyId}": { "schema": "Survey", "description": "Psychology survey submissions" },
+    "/submissions/{submissionId}": { "schema": "Submission", "description": "Story submissions" },
+    "/music/{songId}": { "schema": "Song", "description": "Music playlist songs" },
+    "/mapPoints/{pointId}": { "schema": "KindnessPoint", "description": "Kindness map points" },
+    "/research/{itemId}": { "schema": "Research", "description": "Research publications" }
   }
 }

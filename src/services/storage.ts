@@ -15,201 +15,354 @@ import {
 } from '../types';
 import { cmsService } from './cmsService';
 import { where, orderBy, limit } from 'firebase/firestore';
+import {
+  INITIAL_STORIES,
+  INITIAL_GALLERY,
+  INITIAL_PHOTOVOICE,
+  INITIAL_LETTERS,
+  INITIAL_SONGS,
+  INITIAL_MAP_POINTS,
+  INITIAL_RESEARCH,
+  INITIAL_SETTINGS,
+  INITIAL_SUBMISSIONS
+} from '../data/initialData';
 
 export const storage = {
   // --- Stories / Posts ---
   async getStories(): Promise<Story[]> {
-    const stories = await cmsService.getAll<Story>('posts', [orderBy('createdAt', 'desc')]);
-    return (stories || []).filter(s => s.isDeleted !== true);
+    try {
+      const stories = await cmsService.getAll<Story>('posts', [orderBy('createdAt', 'desc')]);
+      const valid = (stories || []).filter(s => s.isDeleted !== true);
+      return valid.length > 0 ? valid : INITIAL_STORIES;
+    } catch {
+      return INITIAL_STORIES;
+    }
   },
 
   async saveStory(story: Story): Promise<void> {
-    if (story.id && !story.id.startsWith('temp-')) {
-      await cmsService.update('posts', story.id, story);
-    } else {
-      const { id, ...data } = story;
-      await cmsService.create('posts', data as any);
+    try {
+      if (story.id && !story.id.startsWith('temp-') && !story.id.startsWith('story-')) {
+        await cmsService.update('posts', story.id, story);
+      } else {
+        const { id, ...data } = story;
+        await cmsService.create('posts', data as any);
+      }
+    } catch (e) {
+      console.warn('saveStory fallback error:', e);
     }
   },
 
   async deleteStory(id: string): Promise<void> {
-    await cmsService.softDelete('posts', id);
+    try {
+      await cmsService.softDelete('posts', id);
+    } catch (e) {
+      console.warn('deleteStory fallback error:', e);
+    }
   },
 
   async toggleStoryFeature(id: string): Promise<void> {
-    const story = await cmsService.getOne<Story>('posts', id);
-    if (story) {
-      await cmsService.update('posts', id, { featured: !story.featured });
+    try {
+      const story = await cmsService.getOne<Story>('posts', id);
+      if (story) {
+        await cmsService.update('posts', id, { featured: !story.featured });
+      }
+    } catch (e) {
+      console.warn('toggleStoryFeature fallback error:', e);
     }
   },
 
   // --- Submissions ---
   async getSubmissions(): Promise<StorySubmission[]> {
-    const subs = await cmsService.getAll<StorySubmission>('submissions', [orderBy('submittedAt', 'desc')]);
-    return subs || [];
+    try {
+      const subs = await cmsService.getAll<StorySubmission>('submissions', [orderBy('submittedAt', 'desc')]);
+      return subs && subs.length > 0 ? subs : INITIAL_SUBMISSIONS;
+    } catch {
+      return INITIAL_SUBMISSIONS;
+    }
   },
 
   async addSubmission(submission: StorySubmission): Promise<void> {
-    const { id, ...data } = submission;
-    await cmsService.create('submissions', data as any);
+    try {
+      const { id, ...data } = submission;
+      await cmsService.create('submissions', data as any);
+    } catch (e) {
+      console.warn('addSubmission fallback error:', e);
+    }
   },
 
   async updateSubmissionStatus(id: string, status: 'approved' | 'rejected' | 'pending'): Promise<void> {
-    await cmsService.update('submissions', id, { status });
+    try {
+      await cmsService.update('submissions', id, { status });
+    } catch (e) {
+      console.warn('updateSubmissionStatus fallback error:', e);
+    }
   },
 
   // --- Letters ---
   async getLetters(): Promise<Letter[]> {
-    const letters = await cmsService.getAll<Letter>('letters', [orderBy('createdAt', 'desc')]);
-    return letters || [];
+    try {
+      const letters = await cmsService.getAll<Letter>('letters', [orderBy('createdAt', 'desc')]);
+      return letters && letters.length > 0 ? letters : INITIAL_LETTERS;
+    } catch {
+      return INITIAL_LETTERS;
+    }
   },
 
   async addLetter(letter: Letter): Promise<void> {
-    const { id, ...data } = letter;
-    await cmsService.create('letters', data as any);
+    try {
+      const { id, ...data } = letter;
+      await cmsService.create('letters', data as any);
+    } catch (e) {
+      console.warn('addLetter fallback error:', e);
+    }
   },
 
   async updateLetterStatus(id: string, status: 'approved' | 'rejected' | 'pending', reply?: string): Promise<void> {
-    await cmsService.update('letters', id, { status, replyFromLumi: reply });
+    try {
+      await cmsService.update('letters', id, { status, replyFromLumi: reply });
+    } catch (e) {
+      console.warn('updateLetterStatus fallback error:', e);
+    }
   },
 
   async deleteLetter(id: string): Promise<void> {
-    await cmsService.delete('letters', id);
+    try {
+      await cmsService.delete('letters', id);
+    } catch (e) {
+      console.warn('deleteLetter fallback error:', e);
+    }
   },
 
   // --- Photovoice ---
   async getPhotovoice(): Promise<PhotovoiceItem[]> {
-    const items = await cmsService.getAll<PhotovoiceItem>('photovoice', [orderBy('createdAt', 'desc')]);
-    return items || [];
+    try {
+      const items = await cmsService.getAll<PhotovoiceItem>('photovoice', [orderBy('createdAt', 'desc')]);
+      return items && items.length > 0 ? items : INITIAL_PHOTOVOICE;
+    } catch {
+      return INITIAL_PHOTOVOICE;
+    }
   },
 
   async addPhotovoice(item: PhotovoiceItem): Promise<void> {
-    const { id, ...data } = item;
-    await cmsService.create('photovoice', data as any);
+    try {
+      const { id, ...data } = item;
+      await cmsService.create('photovoice', data as any);
+    } catch (e) {
+      console.warn('addPhotovoice fallback error:', e);
+    }
   },
 
   async updatePhotovoiceStatus(id: string, status: 'approved' | 'rejected' | 'pending'): Promise<void> {
-    await cmsService.update('photovoice', id, { status });
+    try {
+      await cmsService.update('photovoice', id, { status });
+    } catch (e) {
+      console.warn('updatePhotovoiceStatus fallback error:', e);
+    }
   },
 
   async deletePhotovoice(id: string): Promise<void> {
-    await cmsService.delete('photovoice', id);
+    try {
+      await cmsService.delete('photovoice', id);
+    } catch (e) {
+      console.warn('deletePhotovoice fallback error:', e);
+    }
   },
 
   // --- Gallery ---
   async getGallery(): Promise<GalleryMediaItem[]> {
-    const items = await cmsService.getAll<GalleryMediaItem>('gallery', [orderBy('createdAt', 'desc')]);
-    return items || [];
+    try {
+      const items = await cmsService.getAll<GalleryMediaItem>('gallery', [orderBy('createdAt', 'desc')]);
+      return items && items.length > 0 ? items : INITIAL_GALLERY;
+    } catch {
+      return INITIAL_GALLERY;
+    }
   },
 
   async addGalleryItem(item: GalleryMediaItem): Promise<void> {
-    const { id, ...data } = item;
-    await cmsService.create('gallery', data as any);
+    try {
+      const { id, ...data } = item;
+      await cmsService.create('gallery', data as any);
+    } catch (e) {
+      console.warn('addGalleryItem fallback error:', e);
+    }
   },
 
   async updateGalleryItem(id: string, updates: Partial<GalleryMediaItem>): Promise<void> {
-    await cmsService.update('gallery', id, updates);
+    try {
+      await cmsService.update('gallery', id, updates);
+    } catch (e) {
+      console.warn('updateGalleryItem fallback error:', e);
+    }
   },
 
   async deleteGalleryItem(id: string): Promise<void> {
-    await cmsService.delete('gallery', id);
+    try {
+      await cmsService.delete('gallery', id);
+    } catch (e) {
+      console.warn('deleteGalleryItem fallback error:', e);
+    }
   },
 
   // --- Surveys ---
   async getSurveys(): Promise<SurveySubmission[]> {
-    const surveys = await cmsService.getAll<SurveySubmission>('surveys', [orderBy('submittedAt', 'desc')]);
-    return surveys || [];
+    try {
+      const surveys = await cmsService.getAll<SurveySubmission>('surveys', [orderBy('submittedAt', 'desc')]);
+      return surveys || [];
+    } catch {
+      return [];
+    }
   },
 
   async addSurvey(survey: SurveySubmission): Promise<void> {
-    const { id, ...data } = survey;
-    await cmsService.create('surveys', data as any);
+    try {
+      const { id, ...data } = survey;
+      await cmsService.create('surveys', data as any);
+    } catch (e) {
+      console.warn('addSurvey fallback error:', e);
+    }
   },
 
   // --- Music ---
   async getMusic(): Promise<SongInfo[]> {
-    const music = await cmsService.getAll<SongInfo>('music', [orderBy('order', 'asc')]);
-    return music || [];
+    try {
+      const music = await cmsService.getAll<SongInfo>('music', [orderBy('order', 'asc')]);
+      return music && music.length > 0 ? music : INITIAL_SONGS;
+    } catch {
+      return INITIAL_SONGS;
+    }
   },
 
   async addSong(song: SongInfo): Promise<void> {
-    const { id, ...data } = song;
-    await cmsService.create('music', data as any);
+    try {
+      const { id, ...data } = song;
+      await cmsService.create('music', data as any);
+    } catch (e) {
+      console.warn('addSong fallback error:', e);
+    }
   },
 
   async updateMusic(id: string, updates: Partial<SongInfo>): Promise<void> {
-    await cmsService.update('music', id, updates);
+    try {
+      await cmsService.update('music', id, updates);
+    } catch (e) {
+      console.warn('updateMusic fallback error:', e);
+    }
   },
 
   async deleteMusic(id: string): Promise<void> {
-    await cmsService.delete('music', id);
+    try {
+      await cmsService.delete('music', id);
+    } catch (e) {
+      console.warn('deleteMusic fallback error:', e);
+    }
   },
 
   // --- Map Points ---
   async getMapPoints(): Promise<KindnessPoint[]> {
-    const points = await cmsService.getAll<KindnessPoint>('mapPoints');
-    return points || [];
+    try {
+      const points = await cmsService.getAll<KindnessPoint>('mapPoints');
+      return points && points.length > 0 ? points : INITIAL_MAP_POINTS;
+    } catch {
+      return INITIAL_MAP_POINTS;
+    }
   },
 
   async addMapPoint(point: KindnessPoint): Promise<void> {
-    const { id, ...data } = point;
-    await cmsService.create('mapPoints', data as any);
+    try {
+      const { id, ...data } = point;
+      await cmsService.create('mapPoints', data as any);
+    } catch (e) {
+      console.warn('addMapPoint fallback error:', e);
+    }
   },
 
   async updateMapPoint(id: string, updates: Partial<KindnessPoint>): Promise<void> {
-    await cmsService.update('mapPoints', id, updates);
+    try {
+      await cmsService.update('mapPoints', id, updates);
+    } catch (e) {
+      console.warn('updateMapPoint fallback error:', e);
+    }
   },
 
   async deleteMapPoint(id: string): Promise<void> {
-    await cmsService.delete('mapPoints', id);
+    try {
+      await cmsService.delete('mapPoints', id);
+    } catch (e) {
+      console.warn('deleteMapPoint fallback error:', e);
+    }
   },
 
   // --- Research ---
   async getResearch(): Promise<ResearchItem[]> {
-    const items = await cmsService.getAll<ResearchItem>('research', [orderBy('order', 'asc')]);
-    return items || [];
+    try {
+      const items = await cmsService.getAll<ResearchItem>('research', [orderBy('order', 'asc')]);
+      return items && items.length > 0 ? items : INITIAL_RESEARCH;
+    } catch {
+      return INITIAL_RESEARCH;
+    }
   },
 
   async addResearchItem(item: ResearchItem): Promise<void> {
-    const { id, ...data } = item;
-    await cmsService.create('research', data as any);
+    try {
+      const { id, ...data } = item;
+      await cmsService.create('research', data as any);
+    } catch (e) {
+      console.warn('addResearchItem fallback error:', e);
+    }
   },
 
   async updateResearchItem(id: string, updates: Partial<ResearchItem>): Promise<void> {
-    await cmsService.update('research', id, updates);
+    try {
+      await cmsService.update('research', id, updates);
+    } catch (e) {
+      console.warn('updateResearchItem fallback error:', e);
+    }
   },
 
   async deleteResearchItem(id: string): Promise<void> {
-    await cmsService.delete('research', id);
+    try {
+      await cmsService.delete('research', id);
+    } catch (e) {
+      console.warn('deleteResearchItem fallback error:', e);
+    }
   },
 
   // --- Users ---
   async getUsers(): Promise<UserProfile[]> {
-    const users = await cmsService.getAll<UserProfile>('users');
-    return users || [];
+    try {
+      const users = await cmsService.getAll<UserProfile>('users');
+      return users || [];
+    } catch {
+      return [];
+    }
   },
 
   // --- Settings ---
   async getSettings(): Promise<SiteSettings> {
-    const settings = await cmsService.getOne<SiteSettings>('siteSettings', 'general');
-    return settings || {
-      isMaintenanceMode: false,
-      siteName: 'LUMI – LAN TỎA LÒNG TRẮC ẨN',
-      slogan: 'NHÌN BẰNG TRÁI TIM – HÀNH ĐỘNG BẰNG YÊU THƯƠNG',
-      contactEmail: 'lumichamiuthuong@gmail.com',
-      contactPhone: '0345824974',
-      announcementText: 'Chào mừng các bạn học sinh THPT toàn quốc đến với không gian lan tỏa lòng trắc ẩn LUMI!'
-    };
+    try {
+      const settings = await cmsService.getOne<SiteSettings>('siteSettings', 'general');
+      return settings || INITIAL_SETTINGS;
+    } catch {
+      return INITIAL_SETTINGS;
+    }
   },
 
   async saveSettings(settings: SiteSettings): Promise<void> {
-    await cmsService.create('siteSettings', settings as any, 'general');
+    try {
+      await cmsService.create('siteSettings', settings as any, 'general');
+    } catch (e) {
+      console.warn('saveSettings fallback error:', e);
+    }
   },
 
   // --- Audit Logs ---
   async getAuditLogs(): Promise<AuditLog[]> {
-    const logs = await cmsService.getAll<AuditLog>('auditLogs', [orderBy('createdAt', 'desc'), limit(100)]);
-    return logs || [];
+    try {
+      const logs = await cmsService.getAll<AuditLog>('auditLogs', [orderBy('createdAt', 'desc'), limit(100)]);
+      return logs || [];
+    } catch {
+      return [];
+    }
   },
 
   // --- Online Presence Tracking ---
@@ -251,3 +404,4 @@ export const storage = {
     }
   }
 };
+

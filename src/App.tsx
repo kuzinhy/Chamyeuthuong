@@ -67,7 +67,7 @@ function AppContent() {
 
   const loadAllData = useCallback(async () => {
     try {
-      const [s, sub, l, g, p, sur] = await Promise.all([
+      const results = await Promise.allSettled([
         storage.getStories(),
         storage.getSubmissions(),
         storage.getLetters(),
@@ -75,12 +75,12 @@ function AppContent() {
         storage.getPhotovoice(),
         storage.getSurveys()
       ]);
-      setStories(s);
-      setSubmissions(sub);
-      setLetters(l);
-      setGalleryItems(g);
-      setPhotovoiceItems(p);
-      setSurveys(sur);
+      if (results[0].status === 'fulfilled') setStories(results[0].value);
+      if (results[1].status === 'fulfilled') setSubmissions(results[1].value);
+      if (results[2].status === 'fulfilled') setLetters(results[2].value);
+      if (results[3].status === 'fulfilled') setGalleryItems(results[3].value);
+      if (results[4].status === 'fulfilled') setPhotovoiceItems(results[4].value);
+      if (results[5].status === 'fulfilled') setSurveys(results[5].value);
     } catch (error) {
       console.error('Error loading data:', error);
     }

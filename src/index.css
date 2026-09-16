@@ -6,17 +6,17 @@
   --font-handwriting: "Caveat", cursive;
   --font-mono: ui-monospace, SFMono-Regular, monospace;
 
-  --color-primary: #0284c7;
-  --color-primary-hover: #0369a1;
-  --color-primary-dark: #075985;
-  --color-tech-cyan: #06b6d4;
-  --color-tech-blue: #2563eb;
-  --color-blue-light: #e0f2fe;
-  --color-blue-extra-light: #f0f9ff;
-  --color-secondary: #38bdf8;
+  --color-primary: #006eff;
+  --color-primary-hover: #0056cc;
+  --color-primary-dark: #0b1f3a;
+  --color-tech-cyan: #00b8ff;
+  --color-tech-blue: #008cff;
+  --color-blue-light: #eaf8ff;
+  --color-blue-extra-light: #f6fbff;
+  --color-secondary: #38d6ff;
   --color-surface: #ffffff;
   --color-border: #e2e8f0;
-  --color-text-primary: #0f172a;
+  --color-text-primary: #0b1f3a;
   --color-text-secondary: #334155;
   --color-muted: #64748b;
   --color-success: #10b981;
@@ -26,8 +26,8 @@
 
 html {
   scroll-behavior: smooth;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: #f6fbff;
+  color: #0b1f3a;
 }
 
 /* Custom scrollbar */
@@ -49,11 +49,11 @@ html {
 /* Tech Glassmorphism & Loan màu (Color Bleed) system */
 .tech-glow-mesh {
   background-image: 
-    radial-gradient(at 15% 15%, rgba(56, 189, 248, 0.18) 0px, transparent 55%),
-    radial-gradient(at 85% 10%, rgba(99, 102, 241, 0.16) 0px, transparent 50%),
-    radial-gradient(at 50% 65%, rgba(14, 165, 233, 0.14) 0px, transparent 60%),
-    radial-gradient(at 90% 90%, rgba(6, 182, 212, 0.15) 0px, transparent 55%),
-    radial-gradient(at 10% 85%, rgba(59, 130, 246, 0.14) 0px, transparent 50%);
+    radial-gradient(at 15% 15%, rgba(0, 184, 255, 0.18) 0px, transparent 55%),
+    radial-gradient(at 85% 10%, rgba(0, 110, 255, 0.16) 0px, transparent 50%),
+    radial-gradient(at 50% 65%, rgba(56, 214, 255, 0.14) 0px, transparent 60%),
+    radial-gradient(at 90% 90%, rgba(0, 140, 255, 0.15) 0px, transparent 55%),
+    radial-gradient(at 10% 85%, rgba(0, 110, 255, 0.14) 0px, transparent 50%);
 }
 
 .tech-glass-panel {
@@ -61,38 +61,95 @@ html {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(226, 232, 240, 0.85);
-  box-shadow: 0 4px 20px -2px rgba(2, 132, 199, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 4px 20px -2px rgba(0, 110, 255, 0.06), 0 2px 6px -1px rgba(11, 31, 58, 0.03);
 }
 
 .tech-glass-pill {
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(203, 213, 225, 0.7);
-  box-shadow: 0 10px 30px -5px rgba(2, 132, 199, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 10px 30px -5px rgba(0, 110, 255, 0.08), 0 4px 6px -2px rgba(11, 31, 58, 0.04);
+}
+
+.digital-glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 32px 0 rgba(0, 110, 255, 0.09), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.digital-glass-card-accent {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(234, 248, 255, 0.7) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1.5px solid rgba(56, 214, 255, 0.6);
+  box-shadow: 0 12px 36px 0 rgba(0, 140, 255, 0.16), 0 0 20px 0 rgba(0, 184, 255, 0.12), inset 0 1px 2px rgba(255, 255, 255, 1);
 }
 
 .tech-card {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05);
+  box-shadow: 0 1px 3px 0 rgba(11, 31, 58, 0.05);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tech-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 14px 30px -6px rgba(2, 132, 199, 0.12), 0 8px 12px -4px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 14px 30px -6px rgba(0, 110, 255, 0.12), 0 8px 12px -4px rgba(11, 31, 58, 0.04);
   border-color: #7dd3fc;
 }
 
-/* Ambient color bleed orbs (Loan màu) */
-.loan-mau-orb-1 {
-  position: absolute;
-  filter: blur(80px);
-  pointer-events: none;
-  border-radius: 9999px;
-  opacity: 0.75;
-  mix-blend-mode: multiply;
+/* Animations */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes float-delayed {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse-cyan {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes data-flow {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-float-gentle {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float-delayed 5s ease-in-out infinite 1s;
+}
+
+.animate-pulse-cyan {
+  animation: pulse-cyan 3s ease-in-out infinite;
 }
 
 /* Button Shimmer / Tech Sweep */
@@ -111,7 +168,7 @@ html {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.32),
+    rgba(255, 255, 255, 0.36),
     transparent
   );
   transform: skewX(-20deg);
@@ -124,15 +181,28 @@ html {
 }
 
 .text-gradient-tech {
-  background: linear-gradient(135deg, #0284c7 0%, #2563eb 50%, #4f46e5 100%);
+  background: linear-gradient(135deg, #006eff 0%, #008cff 50%, #00b8ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .text-gradient-cyan {
-  background: linear-gradient(135deg, #06b6d4 0%, #0284c7 60%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #006eff 0%, #00b8ff 60%, #38d6ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* Reduced Motion Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-gentle,
+  .animate-float-delayed,
+  .animate-pulse-cyan,
+  .animate-bounce,
+  .animate-pulse,
+  .animate-ping {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 
 /* Leaflet map customization */
