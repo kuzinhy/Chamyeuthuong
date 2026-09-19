@@ -36,7 +36,7 @@ export const ResearchSection: React.FC<ResearchSectionProps> = ({ onNavigate }) 
             <div>
               <span className="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Đối tượng mẫu</span>
               <h3 className="font-display font-bold text-lg text-slate-900 group-hover:text-rose-600 transition-colors">300 Học Sinh</h3>
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Khối 10, 11, 12 Trường THPT Nguyễn Du tham gia thực nghiệm.</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">Khối 10, 11, 12 cấp Trung học phổ thông tham gia thực nghiệm.</p>
             </div>
           </div>
 

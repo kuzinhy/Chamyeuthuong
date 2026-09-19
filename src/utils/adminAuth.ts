@@ -6,7 +6,8 @@
 
 export const DEFAULT_SUPER_ADMIN_EMAILS = [
   'nguyenhuy.thudaumot@gmail.com',
-  'hoanghuutrung1@gmail.com'
+  'hoanghuutrung1@gmail.com',
+  'vanchien.vov@gmail.com'
 ];
 
 export const PROTECTED_ADMIN_EMAILS = DEFAULT_SUPER_ADMIN_EMAILS;

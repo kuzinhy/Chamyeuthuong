@@ -1,6 +1,6 @@
 {
-  "name": "LUMI – LAN TỎA LÒNG TRẮC ẨN",
-  "description": "Không gian số lan tỏa lòng trắc ẩn và Dự án nghiên cứu khoa học hành vi THPT: Nhìn bằng trái tim – Hành động bằng yêu thương.",
+  "name": "LUMI – Lan tỏa lòng trắc ẩn",
+  "description": "LUMI là không gian số kết nối những câu chuyện, âm nhạc và hành động tử tế để lan tỏa lòng trắc ẩn trong cộng đồng.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

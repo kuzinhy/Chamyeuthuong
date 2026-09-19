@@ -9,7 +9,7 @@ export const initialGalleryItems: GalleryMediaItem[] = [
     imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
     date: '10/2024',
     credit: 'Ban Thiết Kế LUMI (Design by ng.m.huy)',
-    source: 'Dự án Khoa học Hành vi THPT Nguyễn Du',
+    source: 'Dự án Khoa học Hành vi Học sinh',
     likes: 184,
     tags: ['Poster', 'Truyền thông thị giác', 'Thông điệp nhân văn']
   },
@@ -40,11 +40,11 @@ export const initialGalleryItems: GalleryMediaItem[] = [
   {
     id: 'gal-4',
     title: 'Workshop Trải Nghiệm Thấu Cảm Học Đường Khối 10-12',
-    description: 'Buổi sinh hoạt chuyên đề với 300 học sinh THPT Nguyễn Du tham gia các trò chơi nhập vai và trắc nghiệm cảm xúc.',
+    description: 'Buổi sinh hoạt chuyên đề với 300 học sinh THPT tham gia các trò chơi nhập vai và trắc nghiệm cảm xúc.',
     category: 'Hình ảnh hoạt động',
     imageUrl: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=1200&q=80',
     date: '10/2024',
-    credit: 'Ban Truyền Thông THPT Nguyễn Du',
+    credit: 'Ban Truyền Thông Học Đường',
     source: 'Hoạt động ngoại khóa trải nghiệm',
     likes: 142,
     tags: ['Workshop', 'Thực nghiệm', 'Học sinh THPT']

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { researchProjectData } from '../data/researchData';
 import { ActiveNavPage } from '../types';
+import { ResearchAnalyticsChart } from '../components/ResearchAnalyticsChart';
 
 interface ResearchPageProps {
   onNavigate: (page: ActiveNavPage) => void;
@@ -344,6 +345,11 @@ export const ResearchPage: React.FC<ResearchPageProps> = ({ onNavigate }) => {
                         <li key={idx}>{step}</li>
                       ))}
                     </ul>
+                  </div>
+
+                  {/* Interactive Pre/Post Test Analytics Chart */}
+                  <div className="pt-4">
+                    <ResearchAnalyticsChart />
                   </div>
                 </div>
               </div>

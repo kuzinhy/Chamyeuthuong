@@ -61,9 +61,9 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     },
     operationType,
     path
-  }
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  };
+  console.warn(`Firestore [${operationType}] warning on path '${path}':`, errInfo.error);
+  return null;
 }
 
 // --- Generic CMS Service ---
@@ -87,23 +87,24 @@ export const cmsService = {
         createdAt: serverTimestamp()
       });
     } catch (error) {
-      console.error('Failed to log action:', error);
+      console.warn('Failed to log action:', error);
     }
   },
 
   // Generic Get All with Pagination
-  async getAll<T>(collectionName: string, constraints: QueryConstraint[] = []) {
+  async getAll<T>(collectionName: string, constraints: QueryConstraint[] = []): Promise<T[]> {
     try {
       const q = query(collection(db, collectionName), ...constraints);
       const snapshot = await getDocs(q);
       return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as T));
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, collectionName);
+      return [];
     }
   },
 
   // Generic Get One
-  async getOne<T>(collectionName: string, id: string) {
+  async getOne<T>(collectionName: string, id: string): Promise<T | null> {
     const path = `${collectionName}/${id}`;
     try {
       const docRef = doc(db, collectionName, id);
@@ -114,6 +115,7 @@ export const cmsService = {
       return null;
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);
+      return null;
     }
   },
 
@@ -128,12 +130,13 @@ export const cmsService = {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
-      await setDoc(docRef, finalData);
+      await setDoc(docRef, finalData, { merge: true });
       
       await this.logAction('CREATE', collectionName, docRef.id, `Created new ${collectionName}`);
       return docRef.id;
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, collectionName);
+      throw error;
     }
   },
 
@@ -146,11 +149,13 @@ export const cmsService = {
         ...data,
         updatedAt: serverTimestamp()
       };
-      await updateDoc(docRef, finalData);
+      // Use setDoc with merge: true so both existing and non-existing initial items can be saved safely
+      await setDoc(docRef, finalData, { merge: true });
       
       await this.logAction('UPDATE', collectionName, id, `Updated ${collectionName}`);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
     }
   },
 
@@ -160,16 +165,17 @@ export const cmsService = {
     try {
       const user = auth.currentUser;
       const docRef = doc(db, collectionName, id);
-      await updateDoc(docRef, {
+      await setDoc(docRef, {
         isDeleted: true,
         deletedAt: serverTimestamp(),
         deletedBy: user?.uid || 'unknown',
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
       
       await this.logAction('DELETE', collectionName, id, `Soft deleted ${collectionName}`);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
+      throw error;
     }
   },
 

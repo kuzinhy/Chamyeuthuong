@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, MapPin, Calendar, Heart, Share2, Sparkles, ExternalLink, Eye, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, MapPin, Calendar, Heart, Share2, Sparkles, ExternalLink, Eye, Check, Volume2, VolumeX, Play, Pause, RotateCcw } from 'lucide-react';
 import { Story } from '../types';
 import { LumiMascot } from './LumiMascot';
 
@@ -21,7 +21,54 @@ export const StoryDetailModal: React.FC<StoryDetailModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [likedAnimation, setLikedAnimation] = useState(false);
 
+  // AI Speech Audiobook state
+  const [isPlayingSpeech, setIsPlayingSpeech] = useState(false);
+  const [speechRate, setSpeechRate] = useState<number>(1);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [story?.id]);
+
   if (!story) return null;
+
+  const handleToggleSpeech = () => {
+    if (!('speechSynthesis' in window)) {
+      alert('Trình duyệt của bạn không hỗ trợ đọc thành tiếng Web Speech API.');
+      return;
+    }
+
+    if (isPlayingSpeech) {
+      window.speechSynthesis.cancel();
+      setIsPlayingSpeech(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    
+    const textToRead = `${story.title}. ${story.excerpt || ''}. ${story.content?.replace(/<[^>]*>?/gm, '') || ''}`;
+    const utterance = new SpeechSynthesisUtterance(textToRead);
+    utterance.lang = 'vi-VN';
+    utterance.rate = speechRate;
+    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const viVoice = voices.find(v => v.lang.includes('vi') || v.lang.includes('VI'));
+    if (viVoice) {
+      utterance.voice = viVoice;
+    }
+
+    utterance.onstart = () => setIsPlayingSpeech(true);
+    utterance.onend = () => setIsPlayingSpeech(false);
+    utterance.onerror = () => setIsPlayingSpeech(false);
+
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  };
 
   const relatedStories = allStories
     .filter(s => s.id !== story.id && (s.category === story.category || s.region === story.region))
@@ -115,6 +162,60 @@ export const StoryDetailModal: React.FC<StoryDetailModalProps> = ({
                 <Eye className="w-3.5 h-3.5" />
                 {story.views || 0} lượt xem
               </span>
+            </div>
+          </div>
+
+          {/* AI Audio Story Reader Bar */}
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-sky-50 via-cyan-50 to-teal-50 border border-cyan-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleToggleSpeech}
+                className={`p-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all cursor-pointer ${
+                  isPlayingSpeech 
+                    ? 'bg-rose-500 hover:bg-rose-600 text-white' 
+                    : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                }`}
+              >
+                {isPlayingSpeech ? (
+                  <>
+                    <Pause className="w-4 h-4 fill-white" />
+                    <span>Tạm Dừng Đọc</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 fill-white" />
+                    <span>Nghe Đọc Câu Chuyện (Giọng LUMI AI)</span>
+                  </>
+                )}
+              </button>
+
+              {isPlayingSpeech && (
+                <div className="flex items-center gap-1">
+                  <span className="w-1 h-3 bg-cyan-600 rounded-full animate-bounce [animation-delay:0.1s]" />
+                  <span className="w-1 h-5 bg-cyan-600 rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <span className="w-1 h-2 bg-cyan-600 rounded-full animate-bounce [animation-delay:0.3s]" />
+                  <span className="w-1 h-4 bg-cyan-600 rounded-full animate-bounce [animation-delay:0.4s]" />
+                  <span className="text-xs font-semibold text-cyan-900 ml-1">Đang phát audio...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Speed selection */}
+            <div className="flex items-center gap-1 text-xs text-slate-600">
+              <span className="font-semibold text-slate-700">Tốc độ:</span>
+              {[1, 1.25, 1.5].map((rate) => (
+                <button
+                  key={rate}
+                  onClick={() => setSpeechRate(rate)}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    speechRate === rate 
+                      ? 'bg-cyan-600 text-white' 
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {rate}x
+                </button>
+              ))}
             </div>
           </div>
 

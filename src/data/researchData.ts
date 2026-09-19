@@ -1,7 +1,7 @@
 export const researchProjectData = {
   title: 'Tác động truyền thông thị giác có định hướng đến sự thay đổi hành vi trắc ẩn của học sinh trung học phổ thông',
   shortTitle: 'Dự Án Nghiên Cứu Khoa Học Hành Vi LUMI',
-  institution: 'Trường THPT Nguyễn Du',
+  institution: 'Đề tài Nghiên cứu Khoa học Hành vi Học sinh THPT',
   sampleSize: '300 học sinh (Khối 10, 11, 12)',
   location: 'Thành phố Hồ Chí Minh & Bình Dương',
   academicField: 'Khoa học Xã hội & Hành vi – Tâm lý học Giáo dục',
@@ -12,7 +12,7 @@ export const researchProjectData = {
       { label: 'Người dùng MXH tại VN', value: '78+ Triệu', detail: 'Chiếm 79% dân số (Digital 2024 Vietnam)' },
       { label: 'Thanh thiếu niên >3h/ngày', value: '51%', detail: 'Xem video TikTok, YouTube, FB (Q&Me 2024)' },
       { label: 'Ảnh hưởng cảm xúc MXH', value: '84%', detail: 'Theo khảo sát của UNICEF Việt Nam 2021' },
-      { label: 'Mẫu khảo sát thực nghiệm', value: '300 HS', detail: 'Khối 10, 11, 12 THPT Nguyễn Du' }
+      { label: 'Mẫu khảo sát thực nghiệm', value: '300 HS', detail: 'Khối 10, 11, 12 cấp THPT' }
     ],
     justification: 'Truyền thông thị giác (hình ảnh, video, infographic) có khả năng tác động trực tiếp và tức thì vào vùng cảm xúc của não bộ, giúp ghi nhớ nhanh hơn văn bản thuần túy. Đề tài vận dụng truyền thông thị giác có định hướng như một công cụ giáo dục cảm xúc tích cực, chuyển hóa sự thờ ơ thành lòng trắc ẩn cụ thể.'
   },

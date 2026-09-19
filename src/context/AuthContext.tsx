@@ -3,6 +3,7 @@ import { UserProfile, UserRole, UserNotification } from '../types';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { auth, signInWithFirebaseGoogle, signOutFirebase } from '../lib/firebase';
 import { userService } from '../services/userService';
+import { isSuperAdminEmail, normalizeEmail } from '../utils/adminAuth';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -76,29 +77,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
+  const syncUserProfile = async (firebaseUser: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null }): Promise<UserProfile> => {
+    const email = normalizeEmail(firebaseUser.email);
+    const isSuperAdminUser = isSuperAdminEmail(email);
+
+    // 1. Fetch profile by Firebase UID
+    let profile = await userService.getProfile(firebaseUser.uid);
+
+    // 2. If not found by UID, check if this email was invited by admin/super_admin
+    if (!profile && email) {
+      const invitedProfile = await userService.getProfileByEmail(email);
+      if (invitedProfile) {
+        profile = await userService.createProfile(firebaseUser.uid, {
+          email,
+          displayName: firebaseUser.displayName || invitedProfile.displayName || 'Người dùng LUMI',
+          avatarUrl: firebaseUser.photoURL || invitedProfile.avatarUrl || '',
+          role: isSuperAdminUser ? 'super_admin' : (invitedProfile.role || 'viewer'),
+          status: 'active'
+        });
+      }
+    }
+
+    // 3. If still no profile, create new profile
+    if (!profile) {
+      profile = await userService.createProfile(firebaseUser.uid, {
+        email,
+        displayName: firebaseUser.displayName || (email ? email.split('@')[0] : 'Người dùng LUMI'),
+        avatarUrl: firebaseUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${email || firebaseUser.uid}`,
+        role: isSuperAdminUser ? 'super_admin' : 'viewer',
+        status: 'active'
+      });
+    } else {
+      // Ensure super admin accounts always retain super_admin role
+      if (isSuperAdminUser && profile.role !== 'super_admin') {
+        profile.role = 'super_admin';
+        await userService.updateRole(firebaseUser.uid, 'super_admin');
+      }
+      await userService.updateLastLogin(firebaseUser.uid);
+    }
+
+    return profile;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
       if (firebaseUser) {
         try {
-          // Fetch or create profile
-          let profile = await userService.getProfile(firebaseUser.uid);
-          
-          if (!profile) {
-            // Check if this is the bootstrapped admin email
-            const isBootstrappedAdmin = firebaseUser.email === 'nguyenhuy.thudaumot@gmail.com';
-            
-            profile = await userService.createProfile(firebaseUser.uid, {
-              email: firebaseUser.email || '',
-              displayName: firebaseUser.displayName || 'Người dùng LUMI',
-              avatarUrl: firebaseUser.photoURL || '',
-              role: isBootstrappedAdmin ? 'super_admin' : 'viewer',
-              status: 'active'
-            });
-          } else {
-            await userService.updateLastLogin(firebaseUser.uid);
-          }
-          
+          const profile = await syncUserProfile(firebaseUser);
           setUser(profile);
         } catch (error) {
           console.error('Error syncing user profile:', error);
@@ -123,9 +149,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const role: UserRole = user ? user.role : 'GUEST';
   const isLoggedIn = !!user;
-  const isSuperAdmin = role === 'super_admin';
-  const isAdmin = role === 'super_admin' || role === 'admin';
-  const isEditor = role === 'super_admin' || role === 'admin' || role === 'editor';
+  const isSuperAdmin = role === 'super_admin' || (user?.email ? isSuperAdminEmail(user.email) : false);
+  const isAdmin = isSuperAdmin || role === 'admin';
+  const isEditor = isSuperAdmin || role === 'admin' || role === 'editor';
 
   const toggleBookmark = (storyId: string): boolean => {
     if (!storyId) return false;
@@ -158,21 +184,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { firebaseUser } = await signInWithFirebaseGoogle();
       setIsAuthModalOpen(false);
-
-      // Immediately fetch or create profile so we can return it to the caller
-      let profile = await userService.getProfile(firebaseUser.uid);
-      
-      if (!profile) {
-        const isBootstrappedAdmin = firebaseUser.email === 'nguyenhuy.thudaumot@gmail.com';
-        profile = await userService.createProfile(firebaseUser.uid, {
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || 'Người dùng LUMI',
-          avatarUrl: firebaseUser.photoURL || '',
-          role: isBootstrappedAdmin ? 'super_admin' : 'viewer',
-          status: 'active'
-        });
-      }
-      
+      const profile = await syncUserProfile(firebaseUser);
+      setUser(profile);
       return profile;
     } catch (err: any) {
       console.error('Firebase login error:', err);
@@ -182,19 +195,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = async (email?: string): Promise<UserProfile> => {
     if (email && email.trim()) {
-      const cleanEmail = email.trim().toLowerCase();
+      const cleanEmail = normalizeEmail(email);
+      const isSuperAdminUser = isSuperAdminEmail(cleanEmail);
       const mockUid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
       let profile = await userService.getProfile(mockUid);
       if (!profile) {
-        const isBootstrappedAdmin = cleanEmail === 'nguyenhuy.thudaumot@gmail.com';
         profile = await userService.createProfile(mockUid, {
           email: cleanEmail,
           displayName: cleanEmail.split('@')[0],
           avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanEmail}`,
-          role: isBootstrappedAdmin ? 'super_admin' : 'viewer',
+          role: isSuperAdminUser ? 'super_admin' : 'viewer',
           status: 'active'
         });
       } else {
+        if (isSuperAdminUser && profile.role !== 'super_admin') {
+          profile.role = 'super_admin';
+          await userService.updateRole(mockUid, 'super_admin');
+        }
         await userService.updateLastLogin(mockUid);
       }
       setUser(profile);

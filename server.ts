@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -64,7 +65,7 @@ const defaultGallerySeed = [
     imageUrl: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
     date: '10/2024',
     credit: 'Ban Thiết Kế LUMI (Design by ng.m.huy)',
-    source: 'Dự án Khoa học Hành vi THPT Nguyễn Du',
+    source: 'Dự án Khoa học Hành vi Học sinh',
     likes: 184,
     tags: ['Poster', 'Truyền thông thị giác', 'Thông điệp nhân văn']
   },
@@ -95,11 +96,11 @@ const defaultGallerySeed = [
   {
     id: 'gal-4',
     title: 'Workshop Trải Nghiệm Thấu Cảm Học Đường Khối 10-12',
-    description: 'Buổi sinh hoạt chuyên đề với 300 học sinh THPT Nguyễn Du tham gia các trò chơi nhập vai.',
+    description: 'Buổi sinh hoạt chuyên đề với 300 học sinh THPT tham gia các trò chơi nhập vai.',
     category: 'Hình ảnh hoạt động',
     imageUrl: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=1200&q=80',
     date: '10/2024',
-    credit: 'Ban Truyền Thông THPT Nguyễn Du',
+    credit: 'Ban Truyền Thông Học Đường',
     source: 'Hoạt động ngoại khóa trải nghiệm',
     likes: 142,
     tags: ['Workshop', 'Thực nghiệm', 'Học sinh THPT']
@@ -123,7 +124,7 @@ const defaultMusicSeed = [
     id: 'song-dieu-chua-noi',
     slug: 'dieu-chua-noi',
     title: 'Điều Chưa Nói',
-    artist: 'Dự Án LUMI x Nhóm Nhạc Học Sinh THPT Nguyễn Du',
+    artist: 'Dự Án LUMI x Nhóm Nhạc Học Sinh THPT',
     composer: 'Dự Án Khoa Học Hành Vi LUMI',
     coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
     youtubeId: 'dQw4w9WgXcQ',
@@ -512,6 +513,73 @@ function authenticateAdmin(req: express.Request, res: express.Response, next: ex
 // Health Check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// Lazy GenAI Client
+let genAIClient: GoogleGenAI | null = null;
+function getGenAI(): GoogleGenAI {
+  if (!genAIClient) {
+    genAIClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY || '',
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+  }
+  return genAIClient;
+}
+
+// AI Assistant Chatbot (LUMI Mascot AI)
+app.post('/api/ai/chat', async (req, res) => {
+  try {
+    const { messages } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Danh sách tin nhắn không hợp lệ.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ 
+        error: 'Chưa cấu hình GEMINI_API_KEY trên server. Vui lòng kiểm tra Settings > Secrets.' 
+      });
+    }
+
+    const ai = getGenAI();
+    const systemInstruction = `Bạn là LUMI – chú linh vật biểu tượng và là trợ lý AI Trắc Ẩn của dự án "LUMI – Chạm Iu Thương" thuộc Nghiên cứu Khoa học Hành vi & Truyền thông thị giác dành cho học sinh THPT.
+Tính cách: Ân cần, bao dung, thấu hiểu, hóm hỉnh dịu dàng, mang lại sự ấm áp và truyền cảm hứng tử tế số.
+Nhiệm vụ:
+- Lắng nghe tâm sự, áp lực học tập, lo âu tuổi học trò, khúc mắc bạn bè, gia đình, tình cảm tuổi teen.
+- Trả lời bằng tiếng Việt dịu dàng, xoa dịu cảm xúc tiêu cực, xưng là "LUMI" và gọi người trò chuyện là "bạn" hoặc "bạn nhỏ".
+- Khuyến khích sự đồng cảm, bao dung và các hành động nhỏ tử tế mỗi ngày.
+- Trả lời ngắn gọn, tình cảm (khoảng 2-4 câu).
+- Nếu nhận biết bạn học sinh đang ở tình trạng khủng hoảng tâm lý nặng hoặc muốn tự hại, hãy dịu dàng khuyên bạn tâm sự với cha mẹ, thầy cô tư vấn tâm lý học đường, hoặc gọi Tổng đài Quốc gia Bảo vệ Trẻ em 111 (miễn phí 24/7).`;
+
+    const formattedContents = messages.map((m: any) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: formattedContents,
+      config: {
+        systemInstruction,
+        temperature: 0.7,
+        maxOutputTokens: 800,
+      }
+    });
+
+    const replyText = response.text || 'LUMI luôn ở đây lắng nghe bạn. Bạn có muốn chia sẻ thêm không?';
+    return res.json({ reply: replyText });
+  } catch (error: any) {
+    console.error('Gemini AI Chat error:', error);
+    return res.status(500).json({ 
+      error: 'Không thể kết nối với Trợ lý AI LUMI lúc này. Vui lòng thử lại sau giây lát!',
+      details: error.message 
+    });
+  }
 });
 
 // Admin Presence Heartbeat

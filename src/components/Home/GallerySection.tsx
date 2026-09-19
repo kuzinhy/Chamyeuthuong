@@ -30,7 +30,7 @@ export const GallerySection: React.FC<GallerySectionProps> = ({
               Thư Viện Hình Ảnh & Poster Can Thiệp
             </h2>
             <p className="text-sm sm:text-base text-slate-500 max-w-xl">
-              Bộ sưu tập poster truyền thông, truyện tranh kỹ thuật số và hình ảnh hoạt động thực nghiệm tại THPT Nguyễn Du.
+              Bộ sưu tập poster truyền thông, truyện tranh kỹ thuật số và hình ảnh hoạt động thực nghiệm tâm lý học đường.
             </p>
           </div>
 

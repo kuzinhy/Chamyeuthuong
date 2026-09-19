@@ -1,6 +1,6 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 
 export const userService = {
   async getProfile(uid: string): Promise<UserProfile | null> {
@@ -13,6 +13,23 @@ export const userService = {
       return null;
     } catch (error) {
       console.error('Error fetching user profile:', error);
+      return null;
+    }
+  },
+
+  async getProfileByEmail(email: string): Promise<UserProfile | null> {
+    try {
+      if (!email) return null;
+      const normalized = email.trim().toLowerCase();
+      const q = query(collection(db, 'users'), where('email', '==', normalized), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const docSnap = snapshot.docs[0];
+        return { id: docSnap.id, ...docSnap.data() } as UserProfile;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching profile by email:', error);
       return null;
     }
   },
@@ -36,12 +53,24 @@ export const userService = {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastLoginAt: serverTimestamp()
-      });
+      }, { merge: true });
       
       return profile;
     } catch (error) {
       console.error('Error creating user profile:', error);
       throw error;
+    }
+  },
+
+  async updateRole(uid: string, role: UserRole) {
+    try {
+      const docRef = doc(db, 'users', uid);
+      await setDoc(docRef, {
+        role,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error updating role:', error);
     }
   },
 

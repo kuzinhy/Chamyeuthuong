@@ -194,7 +194,7 @@ export const MapPage: React.FC<MapPageProps> = ({ stories, onSelectStory }) => {
               Lọc theo vùng miền:
             </span>
             {[
-              { id: 'all', label: 'Tất cả (63 Tỉnh Thành)' },
+              { id: 'all', label: 'Tất cả (34 Tỉnh Thành)' },
               { id: 'Bắc', label: 'Miền Bắc' },
               { id: 'Trung', label: 'Miền Trung' },
               { id: 'Nam', label: 'Miền Nam' }

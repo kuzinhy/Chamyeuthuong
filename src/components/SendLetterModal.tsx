@@ -162,7 +162,7 @@ export const SendLetterModal: React.FC<SendLetterModalProps> = ({
                 placeholder="Hãy viết ra những điều bạn muốn nói từ tận đáy lòng..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-handwriting text-xl focus:outline-none focus:border-rose-400 bg-rose-50/20 resize-none"
+                className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm sm:text-base font-sans focus:outline-none focus:border-rose-400 bg-rose-50/20 resize-none leading-relaxed text-slate-800"
               ></textarea>
             </div>
 

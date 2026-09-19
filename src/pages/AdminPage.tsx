@@ -59,14 +59,14 @@ interface AdminPageProps {
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
-  const { user, role, isAdmin, logout, loading: authLoading } = useAuth();
+  const { user, role, isAdmin, isEditor, logout, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTabType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   if (authLoading) return null;
 
-  if (!user || !isAdmin) {
+  if (!user || (!isAdmin && !isEditor)) {
     return <Forbidden403Page onNavigate={(p) => onNavigate ? onNavigate(p) : (window.location.href = '/')} />;
   }
 

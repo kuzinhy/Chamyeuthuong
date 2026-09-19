@@ -9,6 +9,8 @@ import { InteractiveCursor } from './components/InteractiveCursor';
 import { ProfileDrawer } from './components/ProfileDrawer';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { AuthModal } from './components/AuthModal';
+import { AiChatModal } from './components/AiChatModal';
+import { Sparkles, Bot } from 'lucide-react';
 
 // Providers
 import { ToastProvider, useToast } from './context/ToastContext';
@@ -58,6 +60,7 @@ function AppContent() {
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [isLetterModalOpen, setIsLetterModalOpen] = useState(false);
   const [selectedLightboxItem, setSelectedLightboxItem] = useState<GalleryMediaItem | null>(null);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
 
   // Audio background state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -323,8 +326,26 @@ function AppContent() {
         onNavigate={handleNavigate}
       />
       <AuthModal />
+      <AiChatModal 
+        isOpen={isAiChatOpen}
+        onClose={() => setIsAiChatOpen(false)}
+      />
+
+      {/* Floating AI Chat Mascot Button */}
+      <button
+        onClick={() => setIsAiChatOpen(true)}
+        className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-sky-600 via-cyan-600 to-teal-600 text-white shadow-xl hover:shadow-2xl border border-cyan-200/50 backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+        title="Trò chuyện cùng Trợ lý AI Trắc Ẩn LUMI"
+      >
+        <div className="relative">
+          <Sparkles className="w-5 h-5 text-cyan-200 animate-pulse" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-slate-900 animate-ping" />
+        </div>
+        <span className="font-bold text-xs tracking-wide hidden xs:inline">AI LUMI Trắc Ẩn</span>
+      </button>
+
       <MobileBottomNav activePage={activePage} onNavigate={handleNavigate} />
-      <Footer onNavigate={handleNavigate} />
+      <Footer onNavigate={handleNavigate} isHomePage={activePage === 'home'} />
     </div>
   );
 }

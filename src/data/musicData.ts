@@ -4,7 +4,7 @@ export const featuredSong: SongInfo = {
   id: 'song-dieu-chua-noi',
   slug: 'dieu-chua-noi',
   title: 'Điều Chưa Nói',
-  artist: 'Dự Án LUMI x Nhóm Nhạc Học Sinh THPT Nguyễn Du',
+  artist: 'Dự Án LUMI x Nhóm Nhạc Học Sinh THPT',
   composer: 'Dự Án Khoa Học Hành Vi LUMI',
   coverImage: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
   youtubeId: 'dQw4w9WgXcQ', // Default safe embed placeholder, can be customized in admin
@@ -29,8 +29,8 @@ export const featuredSong: SongInfo = {
     { time: '02:40', text: 'LUMI – Thắp sáng lên ngọn lửa của lòng trắc ẩn.', emphasis: true }
   ],
   credits: {
-    production: 'Ban Truyền Thông & Khoa Học Hành Vi THPT Nguyễn Du',
-    vocals: 'CLB Âm Nhạc Trẻ THPT Nguyễn Du',
+    production: 'Ban Truyền Thông & Khoa Học Hành Vi Học Đường',
+    vocals: 'CLB Âm Nhạc Trẻ Học Đường',
     lyricsBy: 'Nhóm Nghiên Cứu LUMI',
     visualDesign: 'Dự án CHẠM IU THƯƠNG (Design by ng.m.huy)',
     specialThanks: 'Thầy Cô Tham Vấn Tâm Lý & 300 Học Sinh Khối 10-12'

@@ -120,19 +120,20 @@ export const AdminGalleryTab: React.FC = () => {
     try {
       if (editingItem) {
         await storage.updateGalleryItem(editingItem.id, formData);
-        showToast('Đã cập nhật tác phẩm', 'success');
+        showToast('Đã cập nhật tác phẩm thành công', 'success');
       } else {
         await storage.addGalleryItem({
           ...formData,
           date: new Date().toLocaleDateString('vi-VN'),
           likes: 0
         } as any);
-        showToast('Đã thêm tác phẩm mới', 'success');
+        showToast('Đã thêm tác phẩm mới thành công', 'success');
       }
       setIsModalOpen(false);
-      loadData();
+      await loadData();
     } catch (error) {
-      showToast('Lỗi khi lưu tác phẩm', 'error');
+      console.error('Error saving gallery item:', error);
+      showToast('Lỗi khi lưu tác phẩm, vui lòng thử lại', 'error');
     }
   };
 

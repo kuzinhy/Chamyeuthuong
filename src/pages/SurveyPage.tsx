@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { GraduationCap, Award, Send } from 'lucide-react';
+import { GraduationCap, Award, Send, BarChart2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { surveyQuestions } from '../data/surveyData';
+import { ResearchAnalyticsChart } from '../components/ResearchAnalyticsChart';
 
 interface SurveyPageProps {
   onSubmitSurvey: (submission: {
@@ -17,7 +18,7 @@ export const SurveyPage: React.FC<SurveyPageProps> = ({ onSubmitSurvey }) => {
   const [surveyType, setSurveyType] = useState<'pre-test' | 'post-test'>('pre-test');
   const [studentGender, setStudentGender] = useState('Nữ');
   const [studentGrade, setStudentGrade] = useState('Khối 11');
-  const [schoolName, setSchoolName] = useState('THPT Nguyễn Du');
+  const [schoolName, setSchoolName] = useState('Trường THPT');
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [completed, setCompleted] = useState(false);
   const [calculatedScore, setCalculatedScore] = useState<number>(0);
@@ -103,12 +104,17 @@ export const SurveyPage: React.FC<SurveyPageProps> = ({ onSubmitSurvey }) => {
               </p>
             </div>
 
+            {/* Embedded Live Analytics Chart */}
+            <div className="text-left pt-6 border-t border-slate-100">
+              <ResearchAnalyticsChart />
+            </div>
+
             <button
               onClick={() => {
                 setCompleted(false);
                 setAnswers({});
               }}
-              className="px-6 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold"
+              className="px-6 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
             >
               Làm lại bài khảo sát mới
             </button>
