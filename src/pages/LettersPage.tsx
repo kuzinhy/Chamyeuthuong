@@ -1,5 +1,17 @@
 import React, { useState, useMemo } from 'react';
-import { Mail, Heart, Send, Sparkles, Filter, ShieldCheck, MessageCircle, AlertCircle } from 'lucide-react';
+import { 
+  Mail, 
+  Heart, 
+  Send, 
+  Sparkles, 
+  Filter, 
+  ShieldCheck, 
+  MessageCircle, 
+  AlertCircle,
+  ExternalLink,
+  Image as ImageIcon,
+  School
+} from 'lucide-react';
 import { Letter, LetterCategory } from '../types';
 
 interface LettersPageProps {
@@ -9,11 +21,12 @@ interface LettersPageProps {
 }
 
 export const LettersPage: React.FC<LettersPageProps> = ({
-  letters,
+  letters = [],
   onOpenLetterModal,
   onLikeLetter
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const safeLetters = letters || [];
 
   const categories: LetterCategory[] = [
     'Cảm ơn',
@@ -25,12 +38,12 @@ export const LettersPage: React.FC<LettersPageProps> = ({
   ];
 
   const approvedLetters = useMemo(() => {
-    return letters.filter(l => {
-      if (l.status !== 'approved') return false;
+    return safeLetters.filter(l => {
+      if (!l || l.status !== 'approved') return false;
       if (selectedCategory !== 'all' && l.category !== selectedCategory) return false;
       return true;
     });
-  }, [letters, selectedCategory]);
+  }, [safeLetters, selectedCategory]);
 
   const getThemeClass = (theme?: string) => {
     switch(theme) {
@@ -97,10 +110,10 @@ export const LettersPage: React.FC<LettersPageProps> = ({
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            Tất cả thư ({letters.filter(l => l.status === 'approved').length})
+            Tất cả thư ({safeLetters.filter(l => l && l.status === 'approved').length})
           </button>
           {categories.map((cat) => {
-            const count = letters.filter(l => l.status === 'approved' && l.category === cat).length;
+            const count = safeLetters.filter(l => l && l.status === 'approved' && l.category === cat).length;
             return (
               <button
                 key={cat}
@@ -142,10 +155,46 @@ export const LettersPage: React.FC<LettersPageProps> = ({
                 </div>
 
                 {/* Letter text */}
-                <div className="space-y-2 flex-1">
+                <div className="space-y-3 flex-1">
+                  {letter.title && (
+                    <h3 className="font-bold text-base text-slate-900 leading-snug">
+                      {letter.title}
+                    </h3>
+                  )}
                   <p className="text-base sm:text-lg font-handwriting text-xl sm:text-2xl leading-relaxed">
                     “{letter.content}”
                   </p>
+
+                  {/* Attached Image if available */}
+                  {letter.imageUrl && (
+                    <div className="rounded-2xl overflow-hidden border border-black/10 max-h-56 bg-white/60 flex items-center justify-center mt-2 group/img relative">
+                      <img 
+                        src={letter.imageUrl} 
+                        alt="Ảnh đính kèm từ bức thư" 
+                        referrerPolicy="no-referrer"
+                        className="w-full h-44 sm:h-48 object-cover group-hover/img:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Attached Google Drive link if available */}
+                  {letter.driveUrl && (
+                    <div className="pt-1">
+                      <a
+                        href={letter.driveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/90 hover:bg-white text-sky-700 hover:text-sky-800 border border-sky-200 text-xs font-semibold shadow-2xs transition-all max-w-full truncate"
+                        title="Mở tài liệu / ảnh trên Google Drive"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0 text-sky-600" />
+                        <span className="truncate">Tệp đính kèm trên Google Drive</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 {/* Reply from LUMI block if exists */}
@@ -164,12 +213,13 @@ export const LettersPage: React.FC<LettersPageProps> = ({
                 {/* Sender footer */}
                 <div className="pt-3 border-t border-black/5 flex items-center justify-between text-xs">
                   <div>
-                    <p className="font-bold text-xs">
-                      {letter.isAnonymous ? 'Bạn giấu tên' : letter.senderName}
+                    <p className="font-bold text-xs text-slate-900">
+                      {letter.isAnonymous ? 'Bạn giấu tên 💌' : letter.senderName}
                     </p>
-                    {letter.targetPerson && (
-                      <p className="text-[11px] opacity-75">{letter.targetPerson}</p>
-                    )}
+                    <p className="text-[11px] opacity-75">
+                      {letter.schoolOrProvince && <span>{letter.schoolOrProvince} • </span>}
+                      <span>Gửi tới: {letter.targetPerson || 'Cộng đồng'}</span>
+                    </p>
                   </div>
 
                   <button

@@ -11,13 +11,14 @@ interface FeaturedStoriesSectionProps {
 }
 
 export const FeaturedStoriesSection: React.FC<FeaturedStoriesSectionProps> = ({
-  stories,
+  stories = [],
   onSelectStory,
   onNavigate,
   onLikeStory
 }) => {
-  const featured = stories.filter(s => s.featured).slice(0, 3);
-  const displayStories = featured.length > 0 ? featured : stories.slice(0, 3);
+  const safeStories = stories || [];
+  const featured = safeStories.filter(s => s && s.featured).slice(0, 3);
+  const displayStories = featured.length > 0 ? featured : safeStories.slice(0, 3);
 
   return (
     <section id="featured-stories-section" className="py-16 sm:py-24 bg-white border-b border-[#E2E8F0]">

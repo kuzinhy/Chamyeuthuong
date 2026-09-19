@@ -99,9 +99,11 @@ export const AdminUsersTab: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(u => 
-    u.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.displayName?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = (users || []).filter(u => 
+    u && (
+      (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.displayName || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   const getRoleBadge = (role: string) => {

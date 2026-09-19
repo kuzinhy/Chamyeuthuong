@@ -53,12 +53,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         storage.getAuditLogs()
       ]);
 
+      const safeStories = stories || [];
+      const safeSubmissions = submissions || [];
+      const safeUsers = users || [];
+
       setStats({
-        totalPosts: stories.length,
-        publishedPosts: stories.filter(s => s.status === 'published').length,
-        draftPosts: stories.filter(s => s.status === 'draft').length,
-        pendingPosts: submissions.filter(s => s.status === 'pending').length,
-        totalUsers: users.length || 1, // Fallback
+        totalPosts: safeStories.length,
+        publishedPosts: safeStories.filter(s => s && s.status === 'published').length,
+        draftPosts: safeStories.filter(s => s && s.status === 'draft').length,
+        pendingPosts: safeSubmissions.filter(s => s && s.status === 'pending').length,
+        totalUsers: safeUsers.length || 1, // Fallback
         recentLogs: logs || []
       });
     } catch (error) {

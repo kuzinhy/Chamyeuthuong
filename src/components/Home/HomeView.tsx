@@ -1,21 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React from 'react';
 import { 
-  Sparkles, 
-  Send, 
   MapPin, 
   Music, 
   BookOpen, 
-  ArrowRight,
   Heart,
   Camera,
   Layers,
-  GraduationCap,
-  Shield,
-  Compass,
-  Play,
-  Flame,
-  Volume2
+  Compass
 } from 'lucide-react';
 import { ActiveNavPage, Story, Letter, GalleryMediaItem } from '../../types';
 import { Hero } from './Hero';
@@ -38,7 +29,7 @@ interface HomeViewProps {
   onOpenLightbox?: (item: GalleryMediaItem) => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({
+const HomeViewComponent: React.FC<HomeViewProps> = ({
   stories = [],
   letters = [],
   galleryItems = [],
@@ -231,3 +222,5 @@ export const HomeView: React.FC<HomeViewProps> = ({
     </div>
   );
 };
+
+export const HomeView = React.memo(HomeViewComponent);

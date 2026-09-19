@@ -57,8 +57,10 @@ export const AdminMusicTab: React.FC = () => {
   });
 
   const filteredMusic = (musicList || []).filter(s => 
-    (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (s.artist || '').toLowerCase().includes(searchQuery.toLowerCase())
+    s && (
+      (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.artist || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   const handleOpenAdd = () => {

@@ -74,6 +74,7 @@ export const AdminGalleryTab: React.FC = () => {
   const [tagInput, setTagInput] = useState('');
 
   const filteredGallery = (galleryItems || []).filter(item => {
+    if (!item) return false;
     const matchesSearch = 
       (item.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -83,9 +84,11 @@ export const AdminGalleryTab: React.FC = () => {
   });
 
   const filteredPhotovoice = (photovoiceItems || []).filter(p => 
-    (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.studentName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.story || '').toLowerCase().includes(searchQuery.toLowerCase())
+    p && (
+      (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.studentName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.story || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   const handleOpenAdd = () => {

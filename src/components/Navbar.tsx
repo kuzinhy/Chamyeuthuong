@@ -35,14 +35,16 @@ interface NavbarProps {
   activePage: ActiveNavPage;
   onNavigate: (page: ActiveNavPage) => void;
   onOpenSearch: () => void;
+  onOpenLetterModal?: () => void;
   isPlayingAudio?: boolean;
   onToggleAudio?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
+const NavbarComponent: React.FC<NavbarProps> = ({
   activePage,
   onNavigate,
   onOpenSearch,
+  onOpenLetterModal,
   isPlayingAudio = false,
   onToggleAudio
 }) => {
@@ -67,9 +69,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 15);
+      const scrolled = window.scrollY > 15;
+      setIsScrolled(prev => (prev !== scrolled ? scrolled : prev));
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -221,20 +224,35 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   </button>
 
-                  <button
-                    onClick={() => handleNavClick('letters')}
-                    className={`w-full px-3 py-2 text-left text-xs font-medium rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
-                      activePage === 'letters' ? 'bg-[#EFF6FF] text-[#1677FF] font-bold' : 'text-[#334155] hover:bg-[#F8FAFC]'
-                    }`}
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">
-                      <Mail className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold">Hộp thư LUMI</div>
-                      <div className="text-[10px] text-[#64748B]">Gửi gắm yêu thương & sẻ chia</div>
-                    </div>
-                  </button>
+                  <div className="flex items-center justify-between gap-1 group/item">
+                    <button
+                      onClick={() => handleNavClick('letters')}
+                      className={`flex-1 px-3 py-2 text-left text-xs font-medium rounded-xl flex items-center gap-2.5 transition-colors cursor-pointer ${
+                        activePage === 'letters' ? 'bg-[#EFF6FF] text-[#1677FF] font-bold' : 'text-[#334155] hover:bg-[#F8FAFC]'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center flex-shrink-0">
+                        <Mail className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">Hộp thư LUMI</div>
+                        <div className="text-[10px] text-[#64748B]">Gửi gắm yêu thương & sẻ chia</div>
+                      </div>
+                    </button>
+                    {onOpenLetterModal && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExploreDropdownOpen(false);
+                          onOpenLetterModal();
+                        }}
+                        className="px-2 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 shrink-0 transition-colors cursor-pointer mr-1"
+                        title="Viết và gửi một bức thư ngay"
+                      >
+                        Gửi thư
+                      </button>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => handleNavClick('photovoice')}
@@ -544,15 +562,28 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Bản đồ tử tế</span>
           </button>
 
-          <button
-            onClick={() => handleNavClick('letters')}
-            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ${
-              activePage === 'letters' ? 'bg-[#006EFF] text-white shadow-sm' : 'text-slate-700 hover:bg-sky-50'
-            }`}
-          >
-            <Mail className="w-4 h-4" />
-            <span>Hộp thư yêu thương</span>
-          </button>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={() => handleNavClick('letters')}
+              className={`flex-1 flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold ${
+                activePage === 'letters' ? 'bg-[#006EFF] text-white shadow-sm' : 'text-slate-700 hover:bg-sky-50'
+              }`}
+            >
+              <Mail className="w-4 h-4" />
+              <span>Hộp thư yêu thương</span>
+            </button>
+            {onOpenLetterModal && (
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenLetterModal();
+                }}
+                className="px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 shrink-0"
+              >
+                Gửi thư
+              </button>
+            )}
+          </div>
 
           <button
             onClick={() => handleNavClick('music')}
@@ -619,3 +650,5 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+
+export const Navbar = React.memo(NavbarComponent);

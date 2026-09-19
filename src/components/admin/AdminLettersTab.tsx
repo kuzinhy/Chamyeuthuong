@@ -94,6 +94,7 @@ export const AdminLettersTab: React.FC = () => {
   };
 
   const filteredLetters = (letters || []).filter(l => {
+    if (!l) return false;
     const matchesSearch = 
       (l.content || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (l.senderName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

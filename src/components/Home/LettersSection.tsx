@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Heart, ArrowRight, Sparkles, Send } from 'lucide-react';
+import { Mail, Heart, ArrowRight, Sparkles, Send, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { Letter, ActiveNavPage } from '../../types';
 
 interface LettersSectionProps {
@@ -10,12 +10,12 @@ interface LettersSectionProps {
 }
 
 export const LettersSection: React.FC<LettersSectionProps> = ({
-  letters,
+  letters = [],
   onOpenLetterModal,
   onNavigate,
   onLikeLetter
 }) => {
-  const approvedLetters = letters.filter(l => l.status === 'approved').slice(0, 4);
+  const approvedLetters = (letters || []).filter(l => l && l.status === 'approved').slice(0, 4);
 
   const getThemeClass = (theme?: string) => {
     switch(theme) {
@@ -83,9 +83,37 @@ export const LettersSection: React.FC<LettersSectionProps> = ({
               </div>
 
               {/* Letter content */}
-              <p className="text-xs sm:text-sm font-handwriting text-lg sm:text-xl leading-relaxed flex-1 group-hover:text-slate-900 transition-colors">
-                “{letter.content}”
-              </p>
+              <div className="space-y-2 flex-1">
+                {letter.title && (
+                  <h4 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight">
+                    {letter.title}
+                  </h4>
+                )}
+                <p className="text-xs sm:text-sm font-handwriting text-lg sm:text-xl leading-relaxed group-hover:text-slate-900 transition-colors line-clamp-4">
+                  “{letter.content}”
+                </p>
+
+                {/* Attached image preview if exists */}
+                {letter.imageUrl && (
+                  <div className="rounded-xl overflow-hidden max-h-32 border border-black/5 bg-white/50">
+                    <img 
+                      src={letter.imageUrl} 
+                      alt="Ảnh đính kèm" 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-24 sm:h-28 object-cover group-hover:scale-105 transition-transform" 
+                      onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+
+                {/* Attached Drive badge if exists */}
+                {letter.driveUrl && (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/80 text-[10px] text-sky-700 font-semibold border border-sky-200">
+                    <ExternalLink className="w-2.5 h-2.5" />
+                    <span>Có tệp Drive</span>
+                  </div>
+                )}
+              </div>
 
               {/* Sender & Target */}
               <div className="pt-3 border-t border-black/5 flex items-center justify-between text-xs">
@@ -93,9 +121,10 @@ export const LettersSection: React.FC<LettersSectionProps> = ({
                   <p className="font-semibold text-xs">
                     {letter.isAnonymous ? 'Ẩn danh' : letter.senderName}
                   </p>
-                  {letter.targetPerson && (
-                    <p className="text-[10px] opacity-75">{letter.targetPerson}</p>
-                  )}
+                  <p className="text-[10px] opacity-75 truncate max-w-[140px]">
+                    {letter.schoolOrProvince ? `${letter.schoolOrProvince} • ` : ''}
+                    {letter.targetPerson ? `Tới: ${letter.targetPerson}` : 'Cộng đồng'}
+                  </p>
                 </div>
 
                 <button

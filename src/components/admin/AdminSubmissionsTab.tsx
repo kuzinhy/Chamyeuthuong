@@ -49,10 +49,12 @@ export const AdminSubmissionsTab: React.FC = () => {
     }
   };
 
-  const filtered = submissions.filter(s => {
+  const safeSubmissions = submissions || [];
+  const filtered = safeSubmissions.filter(s => {
+    if (!s) return false;
     const matchesSearch = 
-      s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.authorName.toLowerCase().includes(searchQuery.toLowerCase());
+      (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.authorName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -66,7 +68,7 @@ export const AdminSubmissionsTab: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold px-3 py-1.5 bg-sky-100 text-sky-700 rounded-lg">
-            {submissions.filter(s => s.status === 'pending').length} bài chờ duyệt
+            {safeSubmissions.filter(s => s && s.status === 'pending').length} bài chờ duyệt
           </span>
         </div>
       </div>

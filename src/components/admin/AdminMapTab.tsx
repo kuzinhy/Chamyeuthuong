@@ -60,6 +60,7 @@ export const AdminMapTab: React.FC = () => {
   });
 
   const filteredPoints = (points || []).filter(p => {
+    if (!p) return false;
     const matchesSearch = 
       (p.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.province || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

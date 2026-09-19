@@ -1,7 +1,6 @@
 import React from 'react';
 import { BookOpen, ArrowRight, Heart } from 'lucide-react';
 import { ActiveNavPage } from '../../types';
-import { ImpactStats } from './ImpactStats';
 
 interface HeroContentProps {
   onNavigate: (page: ActiveNavPage) => void;
@@ -73,11 +72,6 @@ export const HeroContent: React.FC<HeroContentProps> = ({
           <span className="tracking-wide">GỬI HỘP THƯ YÊU THƯƠNG</span>
         </button>
 
-      </div>
-
-      {/* Impact Stats Block */}
-      <div className="pt-2">
-        <ImpactStats />
       </div>
 
     </div>

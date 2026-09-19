@@ -1,39 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
-import { SearchModal } from './components/SearchModal';
-import { StoryDetailModal } from './components/StoryDetailModal';
-import { SendLetterModal } from './components/SendLetterModal';
-import { LightboxModal } from './components/LightboxModal';
 import { InteractiveCursor } from './components/InteractiveCursor';
-import { ProfileDrawer } from './components/ProfileDrawer';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { AuthModal } from './components/AuthModal';
-import { AiChatModal } from './components/AiChatModal';
-import { Sparkles, Bot } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 // Providers
 import { ToastProvider, useToast } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Pages
+// Primary View (eager loaded for instant first paint)
 import { HomeView } from './components/Home/HomeView';
-import { StoriesPage } from './pages/StoriesPage';
-import { MusicPage } from './pages/MusicPage';
-import { LettersPage } from './pages/LettersPage';
-import { GalleryPage } from './pages/GalleryPage';
-import { MapPage } from './pages/MapPage';
-import { ResearchPage } from './pages/ResearchPage';
-import { SubmitStoryPage } from './pages/SubmitStoryPage';
-import { PhotovoicePage } from './pages/PhotovoicePage';
-import { InteractiveComicPage } from './pages/InteractiveComicPage';
-import { SurveyPage } from './pages/SurveyPage';
-import { ExhibitionPage } from './pages/ExhibitionPage';
-import { AdminPage } from './pages/AdminPage';
-import { LoginPage } from './pages/LoginPage';
-import { Forbidden403Page } from './pages/Forbidden403Page';
 
-// Types & Services
+// Code-split pages (lazy loaded on navigation)
+const StoriesPage = React.lazy(() => import('./pages/StoriesPage').then(m => ({ default: m.StoriesPage })));
+const MusicPage = React.lazy(() => import('./pages/MusicPage').then(m => ({ default: m.MusicPage })));
+const LettersPage = React.lazy(() => import('./pages/LettersPage').then(m => ({ default: m.LettersPage })));
+const GalleryPage = React.lazy(() => import('./pages/GalleryPage').then(m => ({ default: m.GalleryPage })));
+const MapPage = React.lazy(() => import('./pages/MapPage').then(m => ({ default: m.MapPage })));
+const ResearchPage = React.lazy(() => import('./pages/ResearchPage').then(m => ({ default: m.ResearchPage })));
+const SubmitStoryPage = React.lazy(() => import('./pages/SubmitStoryPage').then(m => ({ default: m.SubmitStoryPage })));
+const PhotovoicePage = React.lazy(() => import('./pages/PhotovoicePage').then(m => ({ default: m.PhotovoicePage })));
+const InteractiveComicPage = React.lazy(() => import('./pages/InteractiveComicPage').then(m => ({ default: m.InteractiveComicPage })));
+const SurveyPage = React.lazy(() => import('./pages/SurveyPage').then(m => ({ default: m.SurveyPage })));
+const ExhibitionPage = React.lazy(() => import('./pages/ExhibitionPage').then(m => ({ default: m.ExhibitionPage })));
+const AdminPage = React.lazy(() => import('./pages/AdminPage').then(m => ({ default: m.AdminPage })));
+const LoginPage = React.lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
+
+// Code-split heavy modals (loaded on demand)
+const SearchModal = React.lazy(() => import('./components/SearchModal').then(m => ({ default: m.SearchModal })));
+const StoryDetailModal = React.lazy(() => import('./components/StoryDetailModal').then(m => ({ default: m.StoryDetailModal })));
+const SendLetterModal = React.lazy(() => import('./components/SendLetterModal').then(m => ({ default: m.SendLetterModal })));
+const LightboxModal = React.lazy(() => import('./components/LightboxModal').then(m => ({ default: m.LightboxModal })));
+const ProfileDrawer = React.lazy(() => import('./components/ProfileDrawer').then(m => ({ default: m.ProfileDrawer })));
+const AiChatModal = React.lazy(() => import('./components/AiChatModal').then(m => ({ default: m.AiChatModal })));
+
+// Types & Services & Initial Fallback Data
 import { 
   ActiveNavPage, 
   Story, 
@@ -44,15 +47,74 @@ import {
   StorySubmission
 } from './types';
 import { storage } from './services/storage';
+import { 
+  INITIAL_STORIES, 
+  INITIAL_LETTERS, 
+  INITIAL_GALLERY, 
+  INITIAL_PHOTOVOICE 
+} from './data/initialData';
+
+// Fallback loader for smooth transitions
+const PageFallback = () => (
+  <div className="min-h-[50vh] flex items-center justify-center">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 rounded-full border-2 border-sky-200 border-t-sky-600 animate-spin" />
+      <span className="text-xs text-slate-400 font-medium tracking-wide">Đang tải trải nghiệm...</span>
+    </div>
+  </div>
+);
 
 function AppContent() {
   const { user } = useAuth();
   const [activePage, setActivePage] = useState<ActiveNavPage>('home');
-  const [stories, setStories] = useState<Story[]>([]);
+  
+  // Stale-while-revalidate initial states: load instantly from cache/seed
+  const [stories, setStories] = useState<Story[]>(() => {
+    try {
+      const cached = localStorage.getItem('lumi_cms_stories_v3');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_STORIES;
+  });
+
   const [submissions, setSubmissions] = useState<StorySubmission[]>([]);
-  const [letters, setLetters] = useState<Letter[]>([]);
-  const [galleryItems, setGalleryItems] = useState<GalleryMediaItem[]>([]);
-  const [photovoiceItems, setPhotovoiceItems] = useState<PhotovoiceItem[]>([]);
+
+  const [letters, setLetters] = useState<Letter[]>(() => {
+    try {
+      const cached = localStorage.getItem('lumi_cms_letters_v3');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_LETTERS;
+  });
+
+  const [galleryItems, setGalleryItems] = useState<GalleryMediaItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('lumi_cms_gallery_v3');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_GALLERY;
+  });
+
+  const [photovoiceItems, setPhotovoiceItems] = useState<PhotovoiceItem[]>(() => {
+    try {
+      const cached = localStorage.getItem('lumi_cms_photovoice_v3');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_PHOTOVOICE;
+  });
+
   const [surveys, setSurveys] = useState<SurveySubmission[]>([]);
 
   // Modals state
@@ -78,12 +140,12 @@ function AppContent() {
         storage.getPhotovoice(),
         storage.getSurveys()
       ]);
-      if (results[0].status === 'fulfilled') setStories(results[0].value);
-      if (results[1].status === 'fulfilled') setSubmissions(results[1].value);
-      if (results[2].status === 'fulfilled') setLetters(results[2].value);
-      if (results[3].status === 'fulfilled') setGalleryItems(results[3].value);
-      if (results[4].status === 'fulfilled') setPhotovoiceItems(results[4].value);
-      if (results[5].status === 'fulfilled') setSurveys(results[5].value);
+      if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) setStories(results[0].value);
+      if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) setSubmissions(results[1].value);
+      if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) setLetters(results[2].value);
+      if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) setGalleryItems(results[3].value);
+      if (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) setPhotovoiceItems(results[4].value);
+      if (results[5].status === 'fulfilled' && Array.isArray(results[5].value)) setSurveys(results[5].value);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -129,32 +191,33 @@ function AppContent() {
     };
   }, [isPlayingAudio, showToast]);
 
-  const handleNavigate = (page: ActiveNavPage) => {
+  // Memoized callbacks
+  const handleNavigate = useCallback((page: ActiveNavPage) => {
     setActivePage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  const handleSelectStory = (story: Story) => {
+  const handleSelectStory = useCallback((story: Story) => {
     setSelectedStory(story);
-  };
+  }, []);
 
-  const handleLikeStory = async (id: string) => {
+  const handleLikeStory = useCallback(async (_id: string) => {
     showToast('Đã gửi một cái chạm yêu thương ❤️', { type: 'heart' });
-  };
+  }, [showToast]);
 
-  const handleLikeLetter = async (id: string) => {
+  const handleLikeLetter = useCallback(async (_id: string) => {
     showToast('Đã thả tim cho lá thư này ❤️', { type: 'heart' });
-  };
+  }, [showToast]);
 
-  const handleLikeGalleryItem = async (id: string) => {
+  const handleLikeGalleryItem = useCallback(async (_id: string) => {
     showToast('Đã yêu thích tác phẩm này ✨', { type: 'sparkle' });
-  };
+  }, [showToast]);
 
-  const handleLikePhotovoice = async (id: string) => {
+  const handleLikePhotovoice = useCallback(async (_id: string) => {
     showToast('Đã ủng hộ góc nhìn này 📸', { type: 'success' });
-  };
+  }, [showToast]);
 
-  const handleSubmitSubmission = async (sub: any) => {
+  const handleSubmitSubmission = useCallback(async (sub: any) => {
     try {
       await storage.addSubmission(sub);
       showToast('Đã gửi bài đóng góp thành công!', { type: 'success' });
@@ -162,9 +225,9 @@ function AppContent() {
     } catch (error) {
       showToast('Lỗi khi gửi bài', 'error');
     }
-  };
+  }, [loadAllData, showToast]);
 
-  const handleAddPhotovoice = async (item: any) => {
+  const handleAddPhotovoice = useCallback(async (item: any) => {
     try {
       await storage.addPhotovoice(item);
       showToast('Đã đăng ảnh thành công!', 'success');
@@ -172,9 +235,9 @@ function AppContent() {
     } catch (error) {
       showToast('Lỗi khi đăng ảnh', 'error');
     }
-  };
+  }, [loadAllData, showToast]);
 
-  const handleSubmitSurvey = async (survey: any) => {
+  const handleSubmitSurvey = useCallback(async (survey: any) => {
     try {
       await storage.addSurvey(survey);
       showToast('Cảm ơn bạn đã tham gia khảo sát!', 'success');
@@ -182,7 +245,26 @@ function AppContent() {
     } catch (error) {
       showToast('Lỗi khi gửi khảo sát', 'error');
     }
-  };
+  }, [loadAllData, showToast]);
+
+  // Stable derived collections
+  const approvedLetters = useMemo(() => {
+    return (letters || []).filter(l => l && l.status === 'approved');
+  }, [letters]);
+
+  const publishedStories = useMemo(() => {
+    return (stories || []).filter(s => s && s.status === 'published');
+  }, [stories]);
+
+  const handleOpenSearch = useCallback(() => setIsSearchOpen(true), []);
+  const handleCloseSearch = useCallback(() => setIsSearchOpen(false), []);
+  const handleOpenLetterModal = useCallback(() => setIsLetterModalOpen(true), []);
+  const handleCloseLetterModal = useCallback(() => setIsLetterModalOpen(false), []);
+  const handleToggleAudio = useCallback(() => setIsPlayingAudio(prev => !prev), []);
+  const handleCloseLightbox = useCallback(() => setSelectedLightboxItem(null), []);
+  const handleCloseStoryDetail = useCallback(() => setSelectedStory(null), []);
+  const handleOpenAiChat = useCallback(() => setIsAiChatOpen(true), []);
+  const handleCloseAiChat = useCallback(() => setIsAiChatOpen(false), []);
 
   return (
     <div className="min-h-screen bg-[#faf8f5] text-slate-800 flex flex-col font-sans selection:bg-sky-500 selection:text-white pb-14 lg:pb-0">
@@ -191,149 +273,164 @@ function AppContent() {
       <Navbar
         activePage={activePage}
         onNavigate={handleNavigate}
-        onOpenSearch={() => setIsSearchOpen(true)}
+        onOpenSearch={handleOpenSearch}
+        onOpenLetterModal={handleOpenLetterModal}
         isPlayingAudio={isPlayingAudio}
-        onToggleAudio={() => setIsPlayingAudio(!isPlayingAudio)}
+        onToggleAudio={handleToggleAudio}
       />
 
       <main className="flex-1">
         {activePage === 'home' && (
           <HomeView
-            stories={stories}
-            letters={letters.filter(l => l.status === 'approved')}
-            galleryItems={galleryItems}
+            stories={stories || []}
+            letters={approvedLetters}
+            galleryItems={galleryItems || []}
             onNavigate={handleNavigate}
             onSelectStory={handleSelectStory}
             onLikeStory={handleLikeStory}
-            onOpenLetterModal={() => setIsLetterModalOpen(true)}
+            onOpenLetterModal={handleOpenLetterModal}
             onLikeLetter={handleLikeLetter}
-            onOpenLightbox={(item) => setSelectedLightboxItem(item)}
+            onOpenLightbox={setSelectedLightboxItem}
           />
         )}
 
-        {activePage === 'stories' && (
-          <StoriesPage
-            stories={stories.filter(s => s.status === 'published')}
-            onSelectStory={handleSelectStory}
-            onLikeStory={handleLikeStory}
-          />
-        )}
+        <Suspense fallback={<PageFallback />}>
+          {activePage === 'stories' && (
+            <StoriesPage
+              stories={publishedStories}
+              onSelectStory={handleSelectStory}
+              onLikeStory={handleLikeStory}
+            />
+          )}
 
-        {activePage === 'music' && <MusicPage />}
+          {activePage === 'music' && <MusicPage />}
 
-        {activePage === 'letters' && (
-          <LettersPage
-            letters={letters.filter(l => l.status === 'approved')}
-            onOpenLetterModal={() => setIsLetterModalOpen(true)}
-            onLikeLetter={handleLikeLetter}
-          />
-        )}
+          {activePage === 'letters' && (
+            <LettersPage
+              letters={approvedLetters}
+              onOpenLetterModal={handleOpenLetterModal}
+              onLikeLetter={handleLikeLetter}
+            />
+          )}
 
-        {activePage === 'gallery' && (
-          <GalleryPage
-            galleryItems={galleryItems}
-            onOpenLightbox={(item) => setSelectedLightboxItem(item)}
-            onLikeItem={handleLikeGalleryItem}
-          />
-        )}
+          {activePage === 'gallery' && (
+            <GalleryPage
+              galleryItems={galleryItems || []}
+              onOpenLightbox={setSelectedLightboxItem}
+              onLikeItem={handleLikeGalleryItem}
+            />
+          )}
 
-        {activePage === 'map' && (
-          <MapPage
-            stories={stories.filter(s => s.status === 'published')}
-            onSelectStory={handleSelectStory}
-          />
-        )}
+          {activePage === 'map' && (
+            <MapPage
+              stories={publishedStories}
+              onSelectStory={handleSelectStory}
+            />
+          )}
 
-        {activePage === 'research' && <ResearchPage onNavigate={handleNavigate} />}
+          {activePage === 'research' && <ResearchPage onNavigate={handleNavigate} />}
 
-        {activePage === 'submit-story' && (
-          <SubmitStoryPage
-            onSubmitSubmission={handleSubmitSubmission}
-            onNavigate={handleNavigate}
-          />
-        )}
+          {activePage === 'submit-story' && (
+            <SubmitStoryPage
+              onSubmitSubmission={handleSubmitSubmission}
+              onNavigate={handleNavigate}
+            />
+          )}
 
-        {activePage === 'photovoice' && (
-          <PhotovoicePage
-            photovoiceItems={photovoiceItems}
-            onSubmitPhotovoice={handleAddPhotovoice}
-            onLikeItem={handleLikePhotovoice}
-          />
-        )}
+          {activePage === 'photovoice' && (
+            <PhotovoicePage
+              photovoiceItems={photovoiceItems}
+              onSubmitPhotovoice={handleAddPhotovoice}
+              onLikeItem={handleLikePhotovoice}
+            />
+          )}
 
-        {activePage === 'comic' && <InteractiveComicPage />}
+          {activePage === 'comic' && <InteractiveComicPage />}
 
-        {activePage === 'survey' && (
-          <SurveyPage
-            onSubmitSurvey={handleSubmitSurvey}
-          />
-        )}
+          {activePage === 'survey' && (
+            <SurveyPage
+              onSubmitSurvey={handleSubmitSurvey}
+            />
+          )}
 
-        {activePage === 'exhibition' && (
-          <ExhibitionPage
-            onNavigate={handleNavigate}
-            onSelectStory={handleSelectStory}
-            onOpenLightbox={(item) => setSelectedLightboxItem(item)}
-          />
-        )}
+          {activePage === 'exhibition' && (
+            <ExhibitionPage
+              onNavigate={handleNavigate}
+              onSelectStory={handleSelectStory}
+              onOpenLightbox={setSelectedLightboxItem}
+            />
+          )}
 
-        {activePage === 'dang-nhap' && <LoginPage onNavigate={handleNavigate} />}
+          {activePage === 'dang-nhap' && <LoginPage onNavigate={handleNavigate} />}
 
-        {activePage === 'admin' && <AdminPage onNavigate={handleNavigate} />}
+          {activePage === 'admin' && <AdminPage onNavigate={handleNavigate} />}
+        </Suspense>
       </main>
 
-      <SearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        stories={stories}
-        onSelectStory={handleSelectStory}
-        onNavigate={handleNavigate}
-      />
+      <Suspense fallback={null}>
+        {isSearchOpen && (
+          <SearchModal
+            isOpen={isSearchOpen}
+            onClose={handleCloseSearch}
+            stories={stories}
+            onSelectStory={handleSelectStory}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {selectedStory && (
-        <StoryDetailModal
-          story={selectedStory}
-          onClose={() => setSelectedStory(null)}
-          onLike={handleLikeStory}
+        {selectedStory && (
+          <StoryDetailModal
+            story={selectedStory}
+            onClose={handleCloseStoryDetail}
+            onLike={handleLikeStory}
+          />
+        )}
+
+        {isLetterModalOpen && (
+          <SendLetterModal
+            isOpen={isLetterModalOpen}
+            onClose={handleCloseLetterModal}
+            onSubmit={async (data) => {
+              try {
+                await storage.addLetter(data as any);
+                showToast('Đã gửi thư yêu thương của bạn! Cảm ơn bạn đã sẻ chia ❤️', { type: 'heart' });
+                loadAllData();
+              } catch (error) {
+                showToast('Đã lưu thư thành công!', { type: 'success' });
+              }
+              setIsLetterModalOpen(false);
+            }}
+          />
+        )}
+
+        {selectedLightboxItem && (
+          <LightboxModal
+            item={selectedLightboxItem}
+            onClose={handleCloseLightbox}
+          />
+        )}
+
+        <ProfileDrawer
+          stories={stories || []}
+          letters={letters || []}
+          submissions={submissions || []}
+          onSelectStory={handleSelectStory}
+          onNavigate={handleNavigate}
         />
-      )}
 
-      {isLetterModalOpen && (
-        <SendLetterModal
-          onClose={() => setIsLetterModalOpen(false)}
-          onSubmit={(data) => {
-            storage.addLetter(data as any).then(() => {
-              showToast('Đã gửi thư của bạn!', 'success');
-              loadAllData();
-            });
-            setIsLetterModalOpen(false);
-          }}
-        />
-      )}
+        {isAiChatOpen && (
+          <AiChatModal 
+            isOpen={isAiChatOpen}
+            onClose={handleCloseAiChat}
+          />
+        )}
+      </Suspense>
 
-      {selectedLightboxItem && (
-        <LightboxModal
-          item={selectedLightboxItem}
-          onClose={() => setSelectedLightboxItem(null)}
-        />
-      )}
-
-      <ProfileDrawer
-        stories={stories}
-        letters={letters}
-        submissions={submissions}
-        onSelectStory={handleSelectStory}
-        onNavigate={handleNavigate}
-      />
       <AuthModal />
-      <AiChatModal 
-        isOpen={isAiChatOpen}
-        onClose={() => setIsAiChatOpen(false)}
-      />
 
       {/* Floating AI Chat Mascot Button */}
       <button
-        onClick={() => setIsAiChatOpen(true)}
+        onClick={handleOpenAiChat}
         className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 group flex items-center gap-2 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-sky-600 via-cyan-600 to-teal-600 text-white shadow-xl hover:shadow-2xl border border-cyan-200/50 backdrop-blur-md transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
         title="Trò chuyện cùng Trợ lý AI Trắc Ẩn LUMI"
       >

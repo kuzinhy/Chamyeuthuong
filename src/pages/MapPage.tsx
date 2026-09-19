@@ -17,19 +17,21 @@ interface MapPageProps {
   onSelectStory: (story: Story) => void;
 }
 
-export const MapPage: React.FC<MapPageProps> = ({ stories, onSelectStory }) => {
+export const MapPage: React.FC<MapPageProps> = ({ stories = [], onSelectStory }) => {
+  const safeStories = stories || [];
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
-  const [activeStory, setActiveStory] = useState<Story | null>(stories[0] || null);
+  const [activeStory, setActiveStory] = useState<Story | null>(safeStories[0] || null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leafletMapRef = useRef<any>(null);
 
-  const filteredStories = stories.filter(s => {
+  const filteredStories = safeStories.filter(s => {
+    if (!s) return false;
     if (selectedRegion === 'all') return true;
     return s.region === selectedRegion;
   });
 
-  const totalProvinces = new Set(stories.map(s => s.province)).size;
-  const totalLikes = stories.reduce((acc, s) => acc + s.likes, 0);
+  const totalProvinces = new Set(safeStories.map(s => s?.province).filter(Boolean)).size;
+  const totalLikes = safeStories.reduce((acc, s) => acc + (s?.likes || 0), 0);
 
   // Initialize Leaflet Map if available in window
   useEffect(() => {

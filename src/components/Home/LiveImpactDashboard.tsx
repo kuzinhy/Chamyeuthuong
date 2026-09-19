@@ -103,23 +103,23 @@ export const LiveImpactDashboard: React.FC<LiveImpactDashboardProps> = ({
   
   // Real-time state metrics
   const [storiesCount, setStoriesCount] = useState<number>(() => {
-    return initialStories.length > 0 ? initialStories.length : 36;
+    return (initialStories || []).length > 0 ? (initialStories || []).length : 36;
   });
   
   const [interactionsCount, setInteractionsCount] = useState<number>(() => {
-    const storyInteractions = initialStories.reduce(
-      (acc, s) => acc + (s.likes || 0) + (s.views || 0), 
+    const storyInteractions = (initialStories || []).reduce(
+      (acc, s) => acc + (s?.likes || 0) + (s?.views || 0), 
       0
     );
     return storyInteractions > 0 ? storyInteractions + 15420 : 48650;
   });
 
   const [lettersCount, setLettersCount] = useState<number>(() => {
-    return initialLetters.length > 0 ? initialLetters.length : 84;
+    return (initialLetters || []).length > 0 ? (initialLetters || []).length : 84;
   });
 
   const [provincesCount, setProvincesCount] = useState<number>(() => {
-    const set = new Set(initialStories.map(s => s.province).filter(Boolean));
+    const set = new Set((initialStories || []).map(s => s?.province).filter(Boolean));
     return set.size > 0 ? Math.max(set.size, 34) : 34;
   });
 
@@ -130,24 +130,27 @@ export const LiveImpactDashboard: React.FC<LiveImpactDashboardProps> = ({
   ]);
 
   // Compute stats from datasets
-  const calculateStats = useCallback((stories: Story[], letters: Letter[], photovoice: PhotovoiceItem[] = []) => {
-    const totalStories = stories.length;
+  const calculateStats = useCallback((stories: Story[] = [], letters: Letter[] = [], photovoice: PhotovoiceItem[] = []) => {
+    const safeStories = stories || [];
+    const safeLetters = letters || [];
+    const safePhotovoice = photovoice || [];
+    const totalStories = safeStories.length;
     
     // Sum of likes, views, interactions across all assets
-    const storyLikes = stories.reduce((acc, s) => acc + (s.likes || 0), 0);
-    const storyViews = stories.reduce((acc, s) => acc + (s.views || 0), 0);
-    const letterLikes = letters.reduce((acc, l) => acc + (l.likes || 0), 0);
-    const pvLikes = photovoice.reduce((acc, p) => acc + (p.likes || 0), 0);
+    const storyLikes = safeStories.reduce((acc, s) => acc + (s?.likes || 0), 0);
+    const storyViews = safeStories.reduce((acc, s) => acc + (s?.views || 0), 0);
+    const letterLikes = safeLetters.reduce((acc, l) => acc + (l?.likes || 0), 0);
+    const pvLikes = safePhotovoice.reduce((acc, p) => acc + (p?.likes || 0), 0);
     
     // Base engagement offset for platform community metrics
     const totalInteractions = storyLikes + storyViews + letterLikes + pvLikes + 18450;
     
-    const totalLetters = letters.length;
+    const totalLetters = safeLetters.length;
     
     // Unique provinces
     const provinces = new Set<string>();
-    stories.forEach(s => {
-      if (s.province) provinces.add(s.province);
+    safeStories.forEach(s => {
+      if (s?.province) provinces.add(s.province);
     });
     const uniqueProvinces = Math.max(provinces.size, 34);
 

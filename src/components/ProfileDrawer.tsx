@@ -57,9 +57,14 @@ export const ProfileDrawer: React.FC<ProfileDrawerProps> = ({
 
   if (!isProfileDrawerOpen || !user) return null;
 
-  const bookmarkedStories = stories.filter(s => savedStoryIds.includes(s.id));
-  const myLetters = letters.filter(l => l.senderName === user.displayName || l.userId === user.id);
-  const mySubmissions = submissions.filter(s => s.userId === user.id || s.authorName === user.displayName);
+  const safeStories = stories || [];
+  const safeLetters = letters || [];
+  const safeSubmissions = submissions || [];
+  const safeBookmarks = savedStoryIds || [];
+
+  const bookmarkedStories = safeStories.filter(s => s && safeBookmarks.includes(s.id));
+  const myLetters = safeLetters.filter(l => l && (l.senderName === user.displayName || l.userId === user.id));
+  const mySubmissions = safeSubmissions.filter(s => s && (s.userId === user.id || s.authorName === user.displayName));
 
   const getRoleBadge = () => {
     switch (role) {

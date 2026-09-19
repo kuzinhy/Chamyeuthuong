@@ -70,8 +70,8 @@ export const StoryDetailModal: React.FC<StoryDetailModalProps> = ({
     window.speechSynthesis.speak(utterance);
   };
 
-  const relatedStories = allStories
-    .filter(s => s.id !== story.id && (s.category === story.category || s.region === story.region))
+  const relatedStories = (allStories || [])
+    .filter(s => s && s.id !== story.id && (s.category === story.category || s.region === story.region))
     .slice(0, 2);
 
   const handleShare = () => {

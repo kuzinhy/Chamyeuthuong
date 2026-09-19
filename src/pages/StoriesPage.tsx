@@ -18,7 +18,7 @@ interface StoriesPageProps {
 }
 
 export const StoriesPage: React.FC<StoriesPageProps> = ({
-  stories,
+  stories = [],
   onSelectStory,
   onLikeStory
 }) => {
@@ -26,11 +26,12 @@ export const StoriesPage: React.FC<StoriesPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedProvince, setSelectedProvince] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const safeStories = stories || [];
 
   // Extract all unique provinces
   const provinces = useMemo(() => {
-    return Array.from(new Set(stories.map(s => s.province))).filter(Boolean).sort();
-  }, [stories]);
+    return Array.from(new Set(safeStories.map(s => s?.province))).filter(Boolean).sort();
+  }, [safeStories]);
 
   const categories: StoryCategory[] = [
     'Trung thực',
@@ -45,21 +46,22 @@ export const StoriesPage: React.FC<StoriesPageProps> = ({
 
   // Filtered stories
   const filteredStories = useMemo(() => {
-    return stories.filter(story => {
+    return safeStories.filter(story => {
+      if (!story) return false;
       if (selectedRegion !== 'all' && story.region !== selectedRegion) return false;
       if (selectedCategory !== 'all' && story.category !== selectedCategory) return false;
       if (selectedProvince !== 'all' && story.province !== selectedProvince) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchTitle = story.title.toLowerCase().includes(q);
-        const matchExcerpt = story.excerpt.toLowerCase().includes(q);
+        const matchTitle = (story.title || '').toLowerCase().includes(q);
+        const matchExcerpt = (story.excerpt || '').toLowerCase().includes(q);
         const matchProvince = (story.province || '').toLowerCase().includes(q);
-        const matchTag = (story.tags || []).some(t => t.toLowerCase().includes(q));
+        const matchTag = (story.tags || []).some(t => t && t.toLowerCase().includes(q));
         if (!matchTitle && !matchExcerpt && !matchProvince && !matchTag) return false;
       }
       return true;
     });
-  }, [stories, selectedRegion, selectedCategory, selectedProvince, searchQuery]);
+  }, [safeStories, selectedRegion, selectedCategory, selectedProvince, searchQuery]);
 
   return (
     <div className="pt-28 pb-20 sm:pb-32 bg-[#F8FAFC] min-h-screen">

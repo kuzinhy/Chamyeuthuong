@@ -102,9 +102,11 @@ export const AdminStoriesTab: React.FC = () => {
     }
   };
 
-  const filteredStories = stories.filter(s => 
-    s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.authorName?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredStories = (stories || []).filter(s => 
+    s && (
+      (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (s.authorName || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   return (

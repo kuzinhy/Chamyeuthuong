@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
 export const InteractiveCursor: React.FC = () => {
-  const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
   const [isVisible, setIsVisible] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
+  const cursorRef = useRef<HTMLDivElement>(null);
+  const rafId = useRef<number | null>(null);
+  const targetPos = useRef({ x: -100, y: -100 });
 
   useEffect(() => {
     // Only on fine pointers (desktop mouse), completely disable on mobile / touchscreen
@@ -11,47 +13,61 @@ export const InteractiveCursor: React.FC = () => {
       return;
     }
 
+    const updateCursorPosition = () => {
+      if (cursorRef.current) {
+        cursorRef.current.style.transform = `translate3d(${targetPos.current.x}px, ${targetPos.current.y}px, 0) translate(-50%, -50%)`;
+      }
+      rafId.current = null;
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
+      targetPos.current = { x: e.clientX, y: e.clientY };
+
+      if (!rafId.current) {
+        rafId.current = requestAnimationFrame(updateCursorPosition);
+      }
+
       setIsVisible(true);
-      setMousePos({ x: e.clientX, y: e.clientY });
 
       const target = e.target as HTMLElement | null;
       const interactiveEl = target?.closest<HTMLElement>(
         'button, a, input, textarea, select, [role="button"], .cursor-pointer'
       );
-      setIsHovering(!!interactiveEl);
+      const hovering = !!interactiveEl;
+      setIsHovering(prev => (prev !== hovering ? hovering : prev));
     };
 
-    const handleMouseLeave = () => setIsVisible(false);
+    const handleMouseLeave = () => {
+      setIsVisible(false);
+      setIsHovering(false);
+    };
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     document.addEventListener('mouseleave', handleMouseLeave);
 
     return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
       window.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseleave', handleMouseLeave);
     };
   }, []);
 
-  if (!isVisible) return null;
+  if (!isVisible || !isHovering) return null;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
-      {/* Gentle, minimal tech halo that only appears faintly when hovering interactive elements */}
-      {isHovering && (
-        <div
-          className="fixed rounded-full pointer-events-none transition-transform duration-100 ease-out will-change-transform"
-          style={{
-            left: `${mousePos.x}px`,
-            top: `${mousePos.y}px`,
-            width: '28px',
-            height: '28px',
-            transform: 'translate(-50%, -50%)',
-            border: '1px solid rgba(2, 132, 199, 0.3)',
-            backgroundColor: 'rgba(56, 189, 248, 0.05)',
-          }}
-        />
-      )}
+      {/* High-performance GPU accelerated halo */}
+      <div
+        ref={cursorRef}
+        className="fixed top-0 left-0 rounded-full pointer-events-none transition-opacity duration-150 ease-out will-change-transform"
+        style={{
+          width: '28px',
+          height: '28px',
+          transform: `translate3d(${targetPos.current.x}px, ${targetPos.current.y}px, 0) translate(-50%, -50%)`,
+          border: '1px solid rgba(2, 132, 199, 0.35)',
+          backgroundColor: 'rgba(56, 189, 248, 0.06)',
+        }}
+      />
     </div>
   );
 };

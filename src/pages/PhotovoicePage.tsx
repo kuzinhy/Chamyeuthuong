@@ -18,7 +18,7 @@ interface PhotovoicePageProps {
 }
 
 export const PhotovoicePage: React.FC<PhotovoicePageProps> = ({
-  photovoiceItems,
+  photovoiceItems = [],
   onSubmitPhotovoice,
   onLikeItem
 }) => {
@@ -31,7 +31,7 @@ export const PhotovoicePage: React.FC<PhotovoicePageProps> = ({
   const [theme, setTheme] = useState('Góc nhìn trắc ẩn');
   const [submitted, setSubmitted] = useState(false);
 
-  const approvedItems = photovoiceItems.filter(p => p.status === 'approved');
+  const approvedItems = (photovoiceItems || []).filter(p => p && p.status === 'approved');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

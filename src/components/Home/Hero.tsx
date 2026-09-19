@@ -2,8 +2,7 @@ import React from 'react';
 import { ActiveNavPage } from '../../types';
 import { DigitalCityBackground } from './DigitalCityBackground';
 import { HeroContent } from './HeroContent';
-import { LumiPedestalMascot } from './LumiPedestalMascot';
-import { FloatingGlassCards } from './FloatingGlassCards';
+import { LumiFriendsCircle } from './LumiFriendsCircle';
 import { HeroTransition } from './HeroTransition';
 
 interface HeroProps {
@@ -16,7 +15,7 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate, onOpenLetterModal }) => 
     <div className="relative">
       
       {/* =========================================================================
-          HERO SECTION: 16:9 Desktop Concept "LUMI DIGITAL CITY - THÀNH PHỐ TỬ TẾ"
+          HERO SECTION: 16:9 Concept "LUMI DIGITAL CITY - THÀNH PHỐ TỬ TẾ"
       ========================================================================== */}
       <section 
         id="hero-section" 
@@ -36,30 +35,9 @@ export const Hero: React.FC<HeroProps> = ({ onNavigate, onOpenLetterModal }) => 
               />
             </div>
 
-            {/* RIGHT COLUMN: Mascot on 3D Futuristic Pedestal + Floating Glass Cards */}
+            {/* RIGHT COLUMN: LUMI & Friends Circle in Smart City Plaza */}
             <div className="lg:col-span-6 xl:col-span-6 relative flex flex-col items-center justify-center">
-              
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-6 lg:gap-8 w-full">
-                
-                {/* Center: Lumi on Digital Platform */}
-                <div className="flex-shrink-0">
-                  <LumiPedestalMascot />
-                </div>
-
-                {/* Right: Floating Glass Kindness Cards */}
-                <div className="flex-shrink-0">
-                  <FloatingGlassCards />
-                </div>
-
-              </div>
-
-              {/* Bottom Right Cursive Calligraphy Accent */}
-              <div className="w-full text-right mt-3 pr-4 hidden sm:block">
-                <span className="font-handwriting text-2xl sm:text-3xl text-sky-800/80 font-bold select-none drop-shadow-xs">
-                  Cùng nhau ♡ kiến tạo điều tốt đẹp hơn ♡
-                </span>
-              </div>
-
+              <LumiFriendsCircle onOpenLetterModal={onOpenLetterModal} />
             </div>
 
           </div>

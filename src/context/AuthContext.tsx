@@ -62,7 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [savedStoryIds, setSavedStoryIds] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(BOOKMARKS_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -71,7 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<UserNotification[]>(() => {
     try {
       const saved = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : initialNotifications;
+      if (!saved) return initialNotifications;
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : initialNotifications;
     } catch {
       return initialNotifications;
     }
@@ -237,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userService.updateLastLogin(user.id); 
   };
 
-  const unreadNotificationCount = notifications.filter(n => !n.isRead).length;
+  const unreadNotificationCount = (notifications || []).filter(n => n && !n.isRead).length;
 
   return (
     <AuthContext.Provider

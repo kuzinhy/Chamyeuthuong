@@ -9,11 +9,12 @@ interface GalleryPageProps {
 }
 
 export const GalleryPage: React.FC<GalleryPageProps> = ({
-  galleryItems,
+  galleryItems = [],
   onOpenLightbox,
   onLikeItem
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const safeGalleryItems = galleryItems || [];
 
   const categories: GalleryCategory[] = [
     'Hình ảnh câu chuyện',
@@ -23,9 +24,9 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({
   ];
 
   const filteredItems = useMemo(() => {
-    if (selectedCategory === 'all') return galleryItems;
-    return galleryItems.filter(item => item.category === selectedCategory);
-  }, [galleryItems, selectedCategory]);
+    if (selectedCategory === 'all') return safeGalleryItems;
+    return safeGalleryItems.filter(item => item && item.category === selectedCategory);
+  }, [safeGalleryItems, selectedCategory]);
 
   return (
     <div className="pt-28 pb-20 sm:pb-32 bg-[#faf8f5] min-h-screen">
@@ -55,10 +56,10 @@ export const GalleryPage: React.FC<GalleryPageProps> = ({
                 : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
           >
-            Tất cả tác phẩm ({galleryItems.length})
+            Tất cả tác phẩm ({safeGalleryItems.length})
           </button>
           {categories.map((cat) => {
-            const count = galleryItems.filter(i => i.category === cat).length;
+            const count = safeGalleryItems.filter(i => i && i.category === cat).length;
             return (
               <button
                 key={cat}

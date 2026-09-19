@@ -54,11 +54,46 @@ export type AdminTabType =
   | 'audit'
   | 'users';
 
+const MENU_GROUPS = [
+  {
+    title: 'Tổng quan',
+    items: [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'audit', label: 'Nhật ký hoạt động', icon: History },
+    ]
+  },
+  {
+    title: 'Quản lý Nội dung',
+    items: [
+      { id: 'homepage', label: 'Trang chủ (CMS)', icon: Layout },
+      { id: 'stories', label: 'Bài viết / Chuyện kể', icon: BookOpen },
+      { id: 'submissions', label: 'Duyệt bài gửi về', icon: Send },
+      { id: 'letters', label: 'Hộp thư yêu thương', icon: Mail },
+    ]
+  },
+  {
+    title: 'Media & Interactive',
+    items: [
+      { id: 'gallery', label: 'Thư viện Media', icon: ImageIcon },
+      { id: 'map', label: 'Bản đồ tử tế', icon: MapPin },
+      { id: 'music', label: 'Âm nhạc 432Hz', icon: Music },
+      { id: 'research', label: 'Nghiên cứu hành vi', icon: GraduationCap },
+    ]
+  },
+  {
+    title: 'Hệ thống',
+    items: [
+      { id: 'users', label: 'Người dùng & Quyền', icon: Users },
+      { id: 'settings', label: 'Cài đặt chung', icon: Settings },
+    ]
+  }
+];
+
 interface AdminPageProps {
   onNavigate?: (page: ActiveNavPage) => void;
 }
 
-export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
+const AdminPageComponent: React.FC<AdminPageProps> = ({ onNavigate }) => {
   const { user, role, isAdmin, isEditor, logout, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTabType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -70,40 +105,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     return <Forbidden403Page onNavigate={(p) => onNavigate ? onNavigate(p) : (window.location.href = '/')} />;
   }
 
-  const menuGroups = [
-    {
-      title: 'Tổng quan',
-      items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'audit', label: 'Nhật ký hoạt động', icon: History },
-      ]
-    },
-    {
-      title: 'Quản lý Nội dung',
-      items: [
-        { id: 'homepage', label: 'Trang chủ (CMS)', icon: Layout },
-        { id: 'stories', label: 'Bài viết / Chuyện kể', icon: BookOpen },
-        { id: 'submissions', label: 'Duyệt bài gửi về', icon: Send },
-        { id: 'letters', label: 'Hộp thư yêu thương', icon: Mail },
-      ]
-    },
-    {
-      title: 'Media & Interactive',
-      items: [
-        { id: 'gallery', label: 'Thư viện Media', icon: ImageIcon },
-        { id: 'map', label: 'Bản đồ tử tế', icon: MapPin },
-        { id: 'music', label: 'Âm nhạc 432Hz', icon: Music },
-        { id: 'research', label: 'Nghiên cứu hành vi', icon: GraduationCap },
-      ]
-    },
-    {
-      title: 'Hệ thống',
-      items: [
-        { id: 'users', label: 'Người dùng & Quyền', icon: Users },
-        { id: 'settings', label: 'Cài đặt chung', icon: Settings },
-      ]
-    }
-  ];
+  const menuGroups = MENU_GROUPS;
 
   const renderContent = () => {
     switch (activeTab) {
@@ -336,3 +338,5 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigate }) => {
     </div>
   );
 };
+
+export const AdminPage = React.memo(AdminPageComponent);

@@ -31,7 +31,9 @@ import {
 function getLocalCache<T>(key: string): T[] | null {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -56,32 +58,50 @@ function combineWithInitial<T extends { id: string; isDeleted?: boolean }>(
   firestoreItems: T[],
   initialItems: T[]
 ): T[] {
-  const validFirestore = (firestoreItems || []).filter(item => !item.isDeleted);
-  const deletedIds = new Set((firestoreItems || []).filter(item => item.isDeleted).map(item => item.id));
+  const safeFirestore = Array.isArray(firestoreItems) ? firestoreItems : [];
+  const safeInitial = Array.isArray(initialItems) ? initialItems : [];
+  const validFirestore = safeFirestore.filter(item => item && !item.isDeleted);
+  const deletedIds = new Set(safeFirestore.filter(item => item && item.isDeleted).map(item => item.id));
   const firestoreMap = new Map(validFirestore.map(item => [item.id, item]));
 
   const result: T[] = [...validFirestore];
-  for (const initItem of initialItems) {
-    if (!firestoreMap.has(initItem.id) && !deletedIds.has(initItem.id)) {
+  for (const initItem of safeInitial) {
+    if (initItem && !firestoreMap.has(initItem.id) && !deletedIds.has(initItem.id)) {
       result.push(initItem);
     }
   }
   return result;
 }
 
+// In-flight request deduplication map to prevent duplicate concurrent network requests
+const inFlightRequests = new Map<string, Promise<any>>();
+
+function dedupeRequest<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  if (inFlightRequests.has(key)) {
+    return inFlightRequests.get(key) as Promise<T>;
+  }
+  const promise = fetcher().finally(() => {
+    inFlightRequests.delete(key);
+  });
+  inFlightRequests.set(key, promise);
+  return promise;
+}
+
 export const storage = {
   // --- Stories / Posts ---
   async getStories(): Promise<Story[]> {
-    const CACHE_KEY = 'lumi_cms_stories_v3';
-    try {
-      const stories = await cmsService.getAll<Story>('posts');
-      const combined = combineWithInitial(stories || [], INITIAL_STORIES);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<Story>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_STORIES;
-    }
+    return dedupeRequest('stories', async () => {
+      const CACHE_KEY = 'lumi_cms_stories_v3';
+      try {
+        const stories = await cmsService.getAll<Story>('posts');
+        const combined = combineWithInitial(stories || [], INITIAL_STORIES);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<Story>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_STORIES;
+      }
+    });
   },
 
   async saveStory(story: Story): Promise<void> {
@@ -124,16 +144,18 @@ export const storage = {
 
   // --- Submissions ---
   async getSubmissions(): Promise<StorySubmission[]> {
-    const CACHE_KEY = 'lumi_cms_submissions_v3';
-    try {
-      const subs = await cmsService.getAll<StorySubmission>('submissions');
-      const combined = combineWithInitial(subs || [], INITIAL_SUBMISSIONS);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<StorySubmission>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_SUBMISSIONS;
-    }
+    return dedupeRequest('submissions', async () => {
+      const CACHE_KEY = 'lumi_cms_submissions_v3';
+      try {
+        const subs = await cmsService.getAll<StorySubmission>('submissions');
+        const combined = combineWithInitial(subs || [], INITIAL_SUBMISSIONS);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<StorySubmission>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_SUBMISSIONS;
+      }
+    });
   },
 
   async addSubmission(submission: StorySubmission): Promise<void> {
@@ -171,16 +193,18 @@ export const storage = {
 
   // --- Letters ---
   async getLetters(): Promise<Letter[]> {
-    const CACHE_KEY = 'lumi_cms_letters_v3';
-    try {
-      const letters = await cmsService.getAll<Letter>('letters');
-      const combined = combineWithInitial(letters || [], INITIAL_LETTERS);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<Letter>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_LETTERS;
-    }
+    return dedupeRequest('letters', async () => {
+      const CACHE_KEY = 'lumi_cms_letters_v3';
+      try {
+        const letters = await cmsService.getAll<Letter>('letters');
+        const combined = combineWithInitial(letters || [], INITIAL_LETTERS);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<Letter>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_LETTERS;
+      }
+    });
   },
 
   async addLetter(letter: Letter): Promise<void> {
@@ -229,16 +253,18 @@ export const storage = {
 
   // --- Photovoice ---
   async getPhotovoice(): Promise<PhotovoiceItem[]> {
-    const CACHE_KEY = 'lumi_cms_photovoice_v3';
-    try {
-      const items = await cmsService.getAll<PhotovoiceItem>('photovoice');
-      const combined = combineWithInitial(items || [], INITIAL_PHOTOVOICE);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<PhotovoiceItem>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_PHOTOVOICE;
-    }
+    return dedupeRequest('photovoice', async () => {
+      const CACHE_KEY = 'lumi_cms_photovoice_v3';
+      try {
+        const items = await cmsService.getAll<PhotovoiceItem>('photovoice');
+        const combined = combineWithInitial(items || [], INITIAL_PHOTOVOICE);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<PhotovoiceItem>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_PHOTOVOICE;
+      }
+    });
   },
 
   async addPhotovoice(item: PhotovoiceItem): Promise<void> {
@@ -287,17 +313,19 @@ export const storage = {
 
   // --- Gallery ---
   async getGallery(): Promise<GalleryMediaItem[]> {
-    const CACHE_KEY = 'lumi_cms_gallery_v3';
-    try {
-      const items = await cmsService.getAll<GalleryMediaItem>('gallery');
-      const combined = combineWithInitial(items || [], INITIAL_GALLERY);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch (e) {
-      console.warn('getGallery firestore error, falling back to cache:', e);
-      const cached = getLocalCache<GalleryMediaItem>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_GALLERY;
-    }
+    return dedupeRequest('gallery', async () => {
+      const CACHE_KEY = 'lumi_cms_gallery_v3';
+      try {
+        const items = await cmsService.getAll<GalleryMediaItem>('gallery');
+        const combined = combineWithInitial(items || [], INITIAL_GALLERY);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch (e) {
+        console.warn('getGallery firestore error, falling back to cache:', e);
+        const cached = getLocalCache<GalleryMediaItem>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_GALLERY;
+      }
+    });
   },
 
   async addGalleryItem(item: GalleryMediaItem): Promise<void> {
@@ -365,12 +393,14 @@ export const storage = {
 
   // --- Surveys ---
   async getSurveys(): Promise<SurveySubmission[]> {
-    try {
-      const surveys = await cmsService.getAll<SurveySubmission>('surveys', [orderBy('submittedAt', 'desc')]);
-      return surveys || [];
-    } catch {
-      return [];
-    }
+    return dedupeRequest('surveys', async () => {
+      try {
+        const surveys = await cmsService.getAll<SurveySubmission>('surveys', [orderBy('submittedAt', 'desc')]);
+        return surveys || [];
+      } catch {
+        return [];
+      }
+    });
   },
 
   async addSurvey(survey: SurveySubmission): Promise<void> {
@@ -384,16 +414,18 @@ export const storage = {
 
   // --- Music ---
   async getMusic(): Promise<SongInfo[]> {
-    const CACHE_KEY = 'lumi_cms_music_v3';
-    try {
-      const items = await cmsService.getAll<SongInfo>('music');
-      const combined = combineWithInitial(items || [], INITIAL_SONGS);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<SongInfo>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_SONGS;
-    }
+    return dedupeRequest('music', async () => {
+      const CACHE_KEY = 'lumi_cms_music_v3';
+      try {
+        const items = await cmsService.getAll<SongInfo>('music');
+        const combined = combineWithInitial(items || [], INITIAL_SONGS);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<SongInfo>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_SONGS;
+      }
+    });
   },
 
   async addSong(song: SongInfo): Promise<void> {
@@ -442,16 +474,18 @@ export const storage = {
 
   // --- Map Points ---
   async getMapPoints(): Promise<KindnessPoint[]> {
-    const CACHE_KEY = 'lumi_cms_map_points_v3';
-    try {
-      const points = await cmsService.getAll<KindnessPoint>('mapPoints');
-      const combined = combineWithInitial(points || [], INITIAL_MAP_POINTS);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<KindnessPoint>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_MAP_POINTS;
-    }
+    return dedupeRequest('mapPoints', async () => {
+      const CACHE_KEY = 'lumi_cms_map_points_v3';
+      try {
+        const points = await cmsService.getAll<KindnessPoint>('mapPoints');
+        const combined = combineWithInitial(points || [], INITIAL_MAP_POINTS);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<KindnessPoint>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_MAP_POINTS;
+      }
+    });
   },
 
   async addMapPoint(point: KindnessPoint): Promise<void> {
@@ -500,16 +534,18 @@ export const storage = {
 
   // --- Research ---
   async getResearch(): Promise<ResearchItem[]> {
-    const CACHE_KEY = 'lumi_cms_research_v3';
-    try {
-      const items = await cmsService.getAll<ResearchItem>('research');
-      const combined = combineWithInitial(items || [], INITIAL_RESEARCH);
-      setLocalCache(CACHE_KEY, combined);
-      return combined;
-    } catch {
-      const cached = getLocalCache<ResearchItem>(CACHE_KEY);
-      return cached && cached.length > 0 ? cached : INITIAL_RESEARCH;
-    }
+    return dedupeRequest('research', async () => {
+      const CACHE_KEY = 'lumi_cms_research_v3';
+      try {
+        const items = await cmsService.getAll<ResearchItem>('research');
+        const combined = combineWithInitial(items || [], INITIAL_RESEARCH);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
+      } catch {
+        const cached = getLocalCache<ResearchItem>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_RESEARCH;
+      }
+    });
   },
 
   async addResearchItem(item: ResearchItem): Promise<void> {
@@ -558,22 +594,26 @@ export const storage = {
 
   // --- Users ---
   async getUsers(): Promise<UserProfile[]> {
-    try {
-      const users = await cmsService.getAll<UserProfile>('users');
-      return users || [];
-    } catch {
-      return [];
-    }
+    return dedupeRequest('users', async () => {
+      try {
+        const users = await cmsService.getAll<UserProfile>('users');
+        return users || [];
+      } catch {
+        return [];
+      }
+    });
   },
 
   // --- Settings ---
   async getSettings(): Promise<SiteSettings> {
-    try {
-      const settings = await cmsService.getOne<SiteSettings>('siteSettings', 'general');
-      return settings || INITIAL_SETTINGS;
-    } catch {
-      return INITIAL_SETTINGS;
-    }
+    return dedupeRequest('siteSettings', async () => {
+      try {
+        const settings = await cmsService.getOne<SiteSettings>('siteSettings', 'general');
+        return settings || INITIAL_SETTINGS;
+      } catch {
+        return INITIAL_SETTINGS;
+      }
+    });
   },
 
   async saveSettings(settings: SiteSettings): Promise<void> {
@@ -586,12 +626,14 @@ export const storage = {
 
   // --- Audit Logs ---
   async getAuditLogs(): Promise<AuditLog[]> {
-    try {
-      const logs = await cmsService.getAll<AuditLog>('auditLogs', [orderBy('createdAt', 'desc'), limit(100)]);
-      return logs || [];
-    } catch {
-      return [];
-    }
+    return dedupeRequest('auditLogs', async () => {
+      try {
+        const logs = await cmsService.getAll<AuditLog>('auditLogs', [orderBy('createdAt', 'desc'), limit(100)]);
+        return logs || [];
+      } catch {
+        return [];
+      }
+    });
   },
 
   // --- Online Presence Tracking ---
@@ -601,11 +643,15 @@ export const storage = {
       const key = 'lumi_active_presences_v1';
       const cleanEmail = email.trim().toLowerCase();
       const existingRaw = localStorage.getItem(key);
-      let presences: Array<{ email: string; name: string; lastSeen: number }> = existingRaw ? JSON.parse(existingRaw) : [];
+      let presences: Array<{ email: string; name: string; lastSeen: number }> = [];
+      if (existingRaw) {
+        const parsed = JSON.parse(existingRaw);
+        if (Array.isArray(parsed)) presences = parsed;
+      }
       
       // Filter out stale ones older than 30 minutes
       const now = Date.now();
-      presences = presences.filter(p => p.email !== cleanEmail && now - p.lastSeen < 30 * 60 * 1000);
+      presences = (presences || []).filter(p => p && p.email !== cleanEmail && now - p.lastSeen < 30 * 60 * 1000);
       
       presences.push({
         email: cleanEmail,
@@ -624,10 +670,11 @@ export const storage = {
       const key = 'lumi_active_presences_v1';
       const existingRaw = localStorage.getItem(key);
       if (!existingRaw) return [];
-      const presences: Array<{ email: string; name: string; lastSeen: number }> = JSON.parse(existingRaw);
+      const parsed = JSON.parse(existingRaw);
+      const presences = Array.isArray(parsed) ? parsed : [];
       const now = Date.now();
       // Only return ones active within the last 15 minutes
-      return presences.filter(p => now - p.lastSeen < 15 * 60 * 1000);
+      return presences.filter(p => p && now - p.lastSeen < 15 * 60 * 1000);
     } catch {
       return [];
     }

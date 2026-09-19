@@ -131,8 +131,12 @@ export interface Letter {
   senderName: string;
   isAnonymous: boolean;
   category: LetterCategory;
+  title?: string;
   content: string;
   targetPerson?: string;
+  schoolOrProvince?: string;
+  imageUrl?: string;
+  driveUrl?: string;
   createdAt: string;
   likes: number;
   status: 'pending' | 'approved' | 'rejected';
