@@ -108,18 +108,23 @@ export const storage = {
 
   async saveStory(story: Story): Promise<void> {
     const CACHE_KEY = 'lumi_cms_stories_v3';
-    const id = story.id && !story.id.startsWith('temp-') ? story.id : `story-${Date.now()}`;
+    const isNew = !story.id || story.id.startsWith('temp-');
+    const id = !isNew ? story.id : `story-${Date.now()}`;
     const storyToSave = { ...story, id };
     
-    // Update local cache immediately so changes are never lost
-    const current = await this.getStories();
+    // Update local cache immediately so changes are never lost (read synchronously to avoid blocking network latency)
+    const current = getLocalCache<Story>(CACHE_KEY) || INITIAL_STORIES;
     const updated = [storyToSave, ...current.filter(s => s.id !== id)];
     setLocalCache(CACHE_KEY, updated);
 
     // Persist to Firestore
     try {
       const { id: _, ...data } = storyToSave;
-      await cmsService.create('posts', data as any, id);
+      if (isNew) {
+        await cmsService.create('posts', data as any, id);
+      } else {
+        await cmsService.update('posts', id, data as any);
+      }
     } catch (e) {
       console.warn('saveStory firestore sync warning (persisted in local cache):', e);
     }
@@ -127,7 +132,7 @@ export const storage = {
 
   async deleteStory(id: string): Promise<void> {
     const CACHE_KEY = 'lumi_cms_stories_v3';
-    const current = await this.getStories();
+    const current = getLocalCache<Story>(CACHE_KEY) || INITIAL_STORIES;
     setLocalCache(CACHE_KEY, current.filter(s => s.id !== id));
     try {
       await cmsService.softDelete('posts', id);

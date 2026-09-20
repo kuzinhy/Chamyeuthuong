@@ -130,6 +130,27 @@ function AppContent() {
   // Toast
   const { showToast } = useToast();
 
+  const loadCachedData = useCallback(() => {
+    try {
+      const storiesCached = localStorage.getItem('lumi_cms_stories_v3');
+      if (storiesCached) setStories(JSON.parse(storiesCached));
+
+      const lettersCached = localStorage.getItem('lumi_cms_letters_v3');
+      if (lettersCached) setLetters(JSON.parse(lettersCached));
+
+      const galleryCached = localStorage.getItem('lumi_cms_gallery_v3');
+      if (galleryCached) setGalleryItems(JSON.parse(galleryCached));
+
+      const pvCached = localStorage.getItem('lumi_cms_photovoice_v3');
+      if (pvCached) setPhotovoiceItems(JSON.parse(pvCached));
+
+      const subCached = localStorage.getItem('lumi_cms_submissions_v3');
+      if (subCached) setSubmissions(JSON.parse(subCached));
+    } catch (e) {
+      console.warn('Error loading cached data:', e);
+    }
+  }, []);
+
   const loadAllData = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -152,8 +173,9 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
+    loadCachedData();
     loadAllData();
-  }, [loadAllData]);
+  }, [activePage, loadCachedData, loadAllData]);
 
   // Web Audio Gentle Ambient Sound Generator
   useEffect(() => {

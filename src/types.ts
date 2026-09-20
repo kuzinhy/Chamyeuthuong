@@ -100,6 +100,7 @@ export interface SongInfo {
   releaseDate: string;
   description: string;
   message: string;
+  isFeatured?: boolean;
   lyrics: Array<{
     time?: string;
     text: string;

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole, UserNotification } from '../types';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser, signInAnonymously } from 'firebase/auth';
 import { auth, signInWithFirebaseGoogle, signOutFirebase } from '../lib/firebase';
 import { userService } from '../services/userService';
 import { isSuperAdminEmail, normalizeEmail } from '../utils/adminAuth';
@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  const syncUserProfile = async (firebaseUser: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null }): Promise<UserProfile> => {
+  const syncUserProfile = async (firebaseUser: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null; isAnonymous?: boolean }): Promise<UserProfile> => {
     const email = normalizeEmail(firebaseUser.email);
     const isSuperAdminUser = isSuperAdminEmail(email);
 
@@ -104,6 +104,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 3. If still no profile, create new profile
     if (!profile) {
+      if (firebaseUser.isAnonymous) {
+        return {
+          id: firebaseUser.uid,
+          email: '',
+          displayName: 'Khách LUMI',
+          avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${firebaseUser.uid}`,
+          role: 'viewer',
+          status: 'active',
+          createdAt: new Date().toISOString()
+        };
+      }
+
       profile = await userService.createProfile(firebaseUser.uid, {
         email,
         displayName: firebaseUser.displayName || (email ? email.split('@')[0] : 'Người dùng LUMI'),
@@ -201,26 +213,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (email && email.trim()) {
       const cleanEmail = normalizeEmail(email);
       const isSuperAdminUser = isSuperAdminEmail(cleanEmail);
-      const mockUid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      let profile = await userService.getProfile(mockUid);
-      if (!profile) {
-        profile = await userService.createProfile(mockUid, {
+      
+      let firebaseUid = '';
+      try {
+        const credential = await signInAnonymously(auth);
+        firebaseUid = credential.user.uid;
+      } catch (authError) {
+        console.warn('Firebase signInAnonymously failed (using fallback mock UID):', authError);
+        firebaseUid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      }
+
+      let profile = await userService.getProfileByEmail(cleanEmail);
+
+      if (profile) {
+        await userService.createProfile(firebaseUid, {
+          email: cleanEmail,
+          displayName: profile.displayName || cleanEmail.split('@')[0],
+          avatarUrl: profile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanEmail}`,
+          role: isSuperAdminUser ? 'super_admin' : (profile.role || 'viewer'),
+          status: profile.status || 'active'
+        });
+        profile = await userService.getProfile(firebaseUid);
+      } else {
+        profile = await userService.createProfile(firebaseUid, {
           email: cleanEmail,
           displayName: cleanEmail.split('@')[0],
           avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanEmail}`,
           role: isSuperAdminUser ? 'super_admin' : 'viewer',
           status: 'active'
         });
-      } else {
+      }
+
+      if (profile) {
         if (isSuperAdminUser && profile.role !== 'super_admin') {
           profile.role = 'super_admin';
-          await userService.updateRole(mockUid, 'super_admin');
+          await userService.updateRole(firebaseUid, 'super_admin');
         }
-        await userService.updateLastLogin(mockUid);
+        await userService.updateLastLogin(firebaseUid);
       }
+
       setUser(profile);
       setIsAuthModalOpen(false);
-      return profile;
+      return profile!;
     }
     return loginWithFirebasePopup();
   };

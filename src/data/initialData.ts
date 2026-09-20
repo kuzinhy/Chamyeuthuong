@@ -7,7 +7,8 @@ import {
   KindnessPoint, 
   ResearchItem,
   SiteSettings,
-  StorySubmission
+  StorySubmission,
+  UserProfile
 } from '../types';
 
 export const INITIAL_STORIES: Story[] = [
