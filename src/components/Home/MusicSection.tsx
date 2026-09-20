@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
-import { Music, Play, Pause, Disc3, Volume2, ArrowRight, Sparkles, Heart } from 'lucide-react';
-import { featuredSong } from '../../data/musicData';
-import { ActiveNavPage } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { Music, Play, Disc3, ArrowRight, Star } from 'lucide-react';
+import { storage } from '../../services/storage';
+import { SongInfo, ActiveNavPage } from '../../types';
 
 interface MusicSectionProps {
   onNavigate: (page: ActiveNavPage) => void;
 }
 
 export const MusicSection: React.FC<MusicSectionProps> = ({ onNavigate }) => {
-  const [isPlayingSnippet, setIsPlayingSnippet] = useState(false);
+  const [featuredSong, setFeaturedSong] = useState<SongInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    storage.getMusic().then(songs => {
+      // Tìm bài hát được gắn cờ isFeatured, nếu không có thì lấy bài đầu tiên
+      const featured = songs.find(s => s.isFeatured) || songs[0];
+      setFeaturedSong(featured || null);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading || !featuredSong) return null;
 
   return (
     <section id="music-section" className="py-20 sm:py-28 bg-white border-t border-rose-100/50">
@@ -28,7 +40,7 @@ export const MusicSection: React.FC<MusicSectionProps> = ({ onNavigate }) => {
                 onClick={() => onNavigate('music')}
               >
                 <img
-                  src={featuredSong.coverImage}
+                  src={featuredSong.coverImage || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80'}
                   alt={featuredSong.title}
                   className="w-full h-full object-cover group-hover:scale-110 group-hover:rotate-1 transition-transform duration-700 ease-out"
                 />
@@ -39,7 +51,7 @@ export const MusicSection: React.FC<MusicSectionProps> = ({ onNavigate }) => {
                     <Play className="w-7 h-7 fill-white translate-x-0.5 group-hover:scale-110 transition-transform" />
                   </div>
                   <span className="text-xs font-semibold text-rose-200 tracking-wider uppercase group-hover:text-white transition-colors">
-                    Ca khúc chủ đề LUMI
+                    MV Chủ Đề
                   </span>
                   <p className="text-base font-bold text-white mt-1 group-hover:scale-105 transition-transform">
                     {featuredSong.title}
@@ -64,22 +76,9 @@ export const MusicSection: React.FC<MusicSectionProps> = ({ onNavigate }) => {
                 </p>
               </div>
 
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                {featuredSong.description}
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed line-clamp-3">
+                {featuredSong.message || featuredSong.description}
               </p>
-
-              {/* Lyrics quote card with interactive hover glow */}
-              <div className="p-4 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/10 hover:border-rose-400/50 backdrop-blur-md space-y-2 transition-all duration-300 hover:shadow-lg hover:shadow-rose-500/10 group cursor-default">
-                <div className="flex items-center gap-2 text-rose-300 text-xs font-semibold">
-                  <Heart className="w-3 h-3 fill-rose-400 text-rose-400 group-hover:scale-125 transition-transform" />
-                  <span>Điệp khúc truyền cảm hứng:</span>
-                </div>
-                <p className="text-xs sm:text-sm text-rose-100 italic leading-relaxed">
-                  “Nhìn bằng trái tim, sẽ thấy những vết xước vô hình,<br />
-                  Hành động bằng yêu thương, xua tan mùa đông lạnh giá.<br />
-                  Chạm nhẹ bờ vai, để biết bạn không hề đơn độc...”
-                </p>
-              </div>
 
               {/* CTA button */}
               <div className="pt-2 flex flex-wrap items-center gap-4">
@@ -93,13 +92,9 @@ export const MusicSection: React.FC<MusicSectionProps> = ({ onNavigate }) => {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
                 </button>
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       </div>
     </section>
   );

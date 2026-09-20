@@ -1,30 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Music, 
   Play, 
-  Pause, 
   Disc3, 
-  Volume2, 
   Heart, 
   Share2, 
-  Sparkles, 
-  Film, 
-  Mic, 
-  User, 
-  Info,
-  Youtube
 } from 'lucide-react';
-import { featuredSong } from '../data/musicData';
+import { storage } from '../services/storage';
+import { SongInfo } from '../types';
 
 export const MusicPage: React.FC = () => {
+  const [featuredSong, setFeaturedSong] = useState<SongInfo | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeTab, setActiveTab] = useState<'lyrics' | 'behind' | 'credits'>('lyrics');
   const [liked, setLiked] = useState(false);
 
+  useEffect(() => {
+    storage.getMusic().then(songs => {
+      const featured = songs.find(s => s.isFeatured) || songs[0];
+      setFeaturedSong(featured || null);
+      setLoading(false);
+    });
+  }, []);
+
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
-    alert('Đã sao chép link MV "Điều Chưa Nói" vào bộ nhớ tạm!');
+    alert('Đã sao chép link MV vào bộ nhớ tạm!');
   };
+
+  if (loading || !featuredSong) return <div className="pt-28 text-center">Đang tải nội dung...</div>;
 
   return (
     <div className="pt-28 pb-20 sm:pb-32 bg-[#faf8f5] min-h-screen">
@@ -40,7 +45,7 @@ export const MusicPage: React.FC = () => {
             MV “{featuredSong.title}”
           </h1>
           <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            Ca khúc chủ đề chính thức của Chiến dịch LUMI – CHẠM IU THƯƠNG. Bản hòa ca xoa dịu những tổn thương vô hình của tuổi học trò.
+            {featuredSong.message || "Ca khúc chủ đề đặc biệt của chiến dịch."}
           </p>
         </div>
 
@@ -62,7 +67,7 @@ export const MusicPage: React.FC = () => {
                 onClick={() => setIsPlaying(true)}
               >
                 <img
-                  src={featuredSong.coverImage}
+                  src={featuredSong.coverImage || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80'}
                   alt={featuredSong.title}
                   className="w-full h-full object-cover opacity-60 group-hover:opacity-75 transition-opacity"
                 />
@@ -154,7 +159,7 @@ export const MusicPage: React.FC = () => {
               {activeTab === 'lyrics' && (
                 <div className="p-6 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
                   <div className="text-center space-y-3 font-sans">
-                    {featuredSong.lyrics.map((line, idx) => (
+                    {featuredSong.lyrics && featuredSong.lyrics.map((line, idx) => (
                       <p
                         key={idx}
                         className={`text-sm sm:text-base transition-colors ${
@@ -193,33 +198,29 @@ export const MusicPage: React.FC = () => {
                 <div className="p-6 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3 text-xs sm:text-sm text-slate-300">
                   <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                     <span className="text-slate-500">Đơn vị sản xuất:</span>
-                    <span className="font-semibold text-white">{featuredSong.credits.production}</span>
+                    <span className="font-semibold text-white">{featuredSong.credits?.production}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                     <span className="text-slate-500">Thể hiện:</span>
-                    <span className="font-semibold text-white">{featuredSong.credits.vocals}</span>
+                    <span className="font-semibold text-white">{featuredSong.credits?.vocals}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                     <span className="text-slate-500">Lời bài hát & Kịch bản:</span>
-                    <span className="font-semibold text-white">{featuredSong.credits.lyricsBy}</span>
+                    <span className="font-semibold text-white">{featuredSong.credits?.lyricsBy}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                     <span className="text-slate-500">Thiết kế mỹ thuật:</span>
-                    <span className="font-semibold text-white">{featuredSong.credits.visualDesign}</span>
+                    <span className="font-semibold text-white">{featuredSong.credits?.visualDesign}</span>
                   </div>
                   <div className="flex justify-between py-1.5">
                     <span className="text-slate-500">Đồng hành nghiên cứu:</span>
-                    <span className="font-semibold text-white">{featuredSong.credits.specialThanks}</span>
+                    <span className="font-semibold text-white">{featuredSong.credits?.specialThanks}</span>
                   </div>
                 </div>
               )}
-
             </div>
-
           </div>
-
         </div>
-
       </div>
     </div>
   );

@@ -11,7 +11,8 @@ import {
   SongInfo,
   KindnessPoint,
   ResearchItem,
-  UserProfile
+  UserProfile,
+  UserRole
 } from '../types';
 import { cmsService } from './cmsService';
 import { where, orderBy, limit } from 'firebase/firestore';
@@ -24,7 +25,8 @@ import {
   INITIAL_MAP_POINTS,
   INITIAL_RESEARCH,
   INITIAL_SETTINGS,
-  INITIAL_SUBMISSIONS
+  INITIAL_SUBMISSIONS,
+  INITIAL_USERS
 } from '../data/initialData';
 
 // --- Local Storage Cache Helpers ---
@@ -185,7 +187,7 @@ export const storage = {
 
     try {
       const { id: _, ...data } = updatedSub;
-      await cmsService.create('submissions', data as any, id);
+      await cmsService.update('submissions', id, data as any);
     } catch (e) {
       console.warn('updateSubmissionStatus firestore warning:', e);
     }
@@ -234,7 +236,7 @@ export const storage = {
 
     try {
       const { id: _, ...data } = updatedLetter;
-      await cmsService.create('letters', data as any, id);
+      await cmsService.update('letters', id, data as any);
     } catch (e) {
       console.warn('updateLetterStatus firestore warning:', e);
     }
@@ -294,7 +296,7 @@ export const storage = {
 
     try {
       const { id: _, ...data } = updated;
-      await cmsService.create('photovoice', data as any, id);
+      await cmsService.update('photovoice', id, data as any);
     } catch (e) {
       console.warn('updatePhotovoiceStatus firestore warning:', e);
     }
@@ -372,7 +374,7 @@ export const storage = {
     // Save to Firestore with setDoc merge
     try {
       const { id: _, ...data } = mergedItem;
-      await cmsService.create('gallery', data as any, id);
+      await cmsService.update('gallery', id, data as any);
     } catch (e) {
       console.warn('updateGalleryItem firestore warning (saved in local cache):', e);
     }
@@ -437,9 +439,12 @@ export const storage = {
 
     try {
       const { id: _, ...data } = newSong;
+      console.log('Adding song to Firestore:', id, data);
       await cmsService.create('music', data as any, id);
+      console.log('Successfully added song to Firestore:', id);
     } catch (e) {
-      console.warn('addSong firestore warning:', e);
+      console.error('addSong firestore error:', e);
+      throw e;
     }
   },
 
@@ -455,9 +460,12 @@ export const storage = {
 
     try {
       const { id: _, ...data } = merged;
-      await cmsService.create('music', data as any, id);
+      console.log('Updating song in Firestore:', id, data);
+      await cmsService.update('music', id, data as any);
+      console.log('Successfully updated song in Firestore:', id);
     } catch (e) {
-      console.warn('updateMusic firestore warning:', e);
+      console.error('updateMusic firestore error:', e);
+      throw e; // rethrow để admin UI biết lỗi
     }
   },
 
@@ -515,7 +523,7 @@ export const storage = {
 
     try {
       const { id: _, ...data } = merged;
-      await cmsService.create('mapPoints', data as any, id);
+      await cmsService.update('mapPoints', id, data as any);
     } catch (e) {
       console.warn('updateMapPoint firestore warning:', e);
     }
@@ -575,7 +583,7 @@ export const storage = {
 
     try {
       const { id: _, ...data } = merged;
-      await cmsService.create('research', data as any, id);
+      await cmsService.update('research', id, data as any);
     } catch (e) {
       console.warn('updateResearchItem firestore warning:', e);
     }
@@ -595,13 +603,77 @@ export const storage = {
   // --- Users ---
   async getUsers(): Promise<UserProfile[]> {
     return dedupeRequest('users', async () => {
+      const CACHE_KEY = 'lumi_cms_users_v3';
       try {
         const users = await cmsService.getAll<UserProfile>('users');
-        return users || [];
+        const combined = combineWithInitial(users || [], INITIAL_USERS);
+        setLocalCache(CACHE_KEY, combined);
+        return combined;
       } catch {
-        return [];
+        const cached = getLocalCache<UserProfile>(CACHE_KEY);
+        return cached && cached.length > 0 ? cached : INITIAL_USERS;
       }
     });
+  },
+
+  async addUser(user: UserProfile): Promise<void> {
+    const CACHE_KEY = 'lumi_cms_users_v3';
+    const id = user.id || `user-${Date.now()}`;
+    const newUser = { ...user, id };
+    const current = await this.getUsers();
+    setLocalCache(CACHE_KEY, [newUser, ...current.filter(u => u.id !== id)]);
+
+    try {
+      const { id: _, ...data } = newUser;
+      await cmsService.create('users', data as any, id);
+    } catch (e) {
+      console.warn('addUser firestore warning:', e);
+    }
+  },
+
+  async updateUserStatus(id: string, status: 'active' | 'suspended' | 'pending'): Promise<void> {
+    const CACHE_KEY = 'lumi_cms_users_v3';
+    const current = await this.getUsers();
+    const existing = current.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id) || {};
+    const updated = { ...existing, status, id } as UserProfile;
+
+    const updatedList = current.map(u => u.id === id ? updated : u);
+    if (!current.some(u => u.id === id)) updatedList.unshift(updated);
+    setLocalCache(CACHE_KEY, updatedList);
+
+    try {
+      await cmsService.update('users', id, { status });
+    } catch (e) {
+      console.warn('updateUserStatus firestore warning:', e);
+    }
+  },
+
+  async updateUserRole(id: string, role: UserRole): Promise<void> {
+    const CACHE_KEY = 'lumi_cms_users_v3';
+    const current = await this.getUsers();
+    const existing = current.find(u => u.id === id) || INITIAL_USERS.find(u => u.id === id) || {};
+    const updated = { ...existing, role, id } as UserProfile;
+
+    const updatedList = current.map(u => u.id === id ? updated : u);
+    if (!current.some(u => u.id === id)) updatedList.unshift(updated);
+    setLocalCache(CACHE_KEY, updatedList);
+
+    try {
+      await cmsService.update('users', id, { role });
+    } catch (e) {
+      console.warn('updateUserRole firestore warning:', e);
+    }
+  },
+
+  async deleteUser(id: string): Promise<void> {
+    const CACHE_KEY = 'lumi_cms_users_v3';
+    const current = await this.getUsers();
+    setLocalCache(CACHE_KEY, current.filter(u => u.id !== id));
+    try {
+      await cmsService.delete('users', id);
+    } catch (e) {
+      console.warn('deleteUser firestore warning:', e);
+    }
   },
 
   // --- Settings ---
