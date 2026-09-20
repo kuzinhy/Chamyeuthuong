@@ -9,9 +9,10 @@ service cloud.firestore {
     // Check if user is Super Admin
     function isSuperAdmin() {
       return isSignedIn() && 
-        (request.auth.token.email == 'nguyenhuy.thudaumot@gmail.com' || 
-         request.auth.token.email == 'hoanghuutrung1@gmail.com' ||
-         request.auth.token.email == 'vanchien.vov@gmail.com');
+        request.auth.token.email != null &&
+        (request.auth.token.email.lower() == 'nguyenhuy.thudaumot@gmail.com' || 
+         request.auth.token.email.lower() == 'hoanghuutrung1@gmail.com' ||
+         request.auth.token.email.lower() == 'vanchien.vov@gmail.com');
     }
 
     // Check if user is Admin or Editor
