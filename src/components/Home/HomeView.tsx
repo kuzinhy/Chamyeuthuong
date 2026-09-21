@@ -9,7 +9,7 @@ import {
   Compass
 } from 'lucide-react';
 import { ActiveNavPage, Story, Letter, GalleryMediaItem } from '../../types';
-import { Hero } from './Hero';
+import { SimpleMissionHero } from './SimpleMissionHero';
 import { FeaturedStoriesSection } from './FeaturedStoriesSection';
 import { MusicSection } from './MusicSection';
 import { LiveImpactDashboard } from './LiveImpactDashboard';
@@ -43,14 +43,14 @@ const HomeViewComponent: React.FC<HomeViewProps> = ({
   return (
     <div id="home-view" className="w-full min-h-screen bg-[#F8FAFC]">
       
-      {/* 1. CINEMATIC DIGITAL CITY HERO */}
-      <Hero 
+      {/* 1. SIMPLE MISSION HERO (FRAMER MOTION ENTRANCE ANIMATION) */}
+      <SimpleMissionHero 
         onNavigate={onNavigate} 
         onOpenLetterModal={onOpenLetterModal} 
       />
 
       {/* 2. KINDNESS ECOSYSTEM EXPLORATION PILLARS */}
-      <section className="py-16 bg-white border-b border-[#E2E8F0] relative overflow-hidden">
+      <section id="kindness-ecosystem-section" className="py-16 bg-white border-b border-[#E2E8F0] relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
