@@ -144,6 +144,7 @@ export interface Letter {
   replyFromLumi?: string;
   colorTheme?: 'rose' | 'amber' | 'sky' | 'emerald' | 'purple';
   isPublic?: boolean;
+  isDeleted?: boolean;
 }
 
 export type GalleryCategory = 

@@ -199,7 +199,7 @@ export const apiService = {
     return await res.json();
   },
 
-  async moderateLetter(id: string, updates: { status?: 'approved' | 'rejected'; replyFromLumi?: string }, operatorEmail: string): Promise<Letter> {
+  async moderateLetter(id: string, updates: { status?: 'approved' | 'rejected' | 'pending'; replyFromLumi?: string }, operatorEmail: string): Promise<Letter> {
     const res = await fetchWithAuth(`/api/letters/${id}`, {
       method: 'PUT',
       body: JSON.stringify(updates)

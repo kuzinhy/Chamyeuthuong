@@ -18,6 +18,34 @@ import {
   QueryConstraint
 } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
+import { formatFirestoreTimestamp } from '../utils/dateUtils';
+
+/**
+ * Recursively strips undefined values so that Firestore setDoc / updateDoc never throws:
+ * "Unsupported field value: undefined"
+ */
+export function cleanFirestoreData<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  if (Array.isArray(data)) {
+    return data
+      .filter(item => item !== undefined)
+      .map(item => cleanFirestoreData(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    // Keep FieldValue (serverTimestamp, etc.) intact
+    if ((data as any)._methodName || (data.constructor && data.constructor.name === 'FieldValue')) {
+      return data;
+    }
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanFirestoreData(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
+}
 
 export enum OperationType {
   CREATE = 'create',
@@ -96,7 +124,18 @@ export const cmsService = {
     try {
       const q = query(collection(db, collectionName), ...constraints);
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({ id: d.id, ...d.data() } as T));
+      return snapshot.docs.map(d => {
+        const raw = d.data();
+        const item: any = { id: d.id, ...raw };
+        // Normalize Timestamps so React components never crash trying to render raw Timestamp objects
+        if (raw.createdAt && typeof raw.createdAt === 'object') {
+          item.createdAt = formatFirestoreTimestamp(raw.createdAt);
+        }
+        if (raw.updatedAt && typeof raw.updatedAt === 'object') {
+          item.updatedAt = formatFirestoreTimestamp(raw.updatedAt);
+        }
+        return item as T;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, collectionName);
       return [];
@@ -110,7 +149,15 @@ export const cmsService = {
       const docRef = doc(db, collectionName, id);
       const snapshot = await getDoc(docRef);
       if (snapshot.exists()) {
-        return { id: snapshot.id, ...snapshot.data() } as T;
+        const raw = snapshot.data();
+        const item: any = { id: snapshot.id, ...raw };
+        if (raw.createdAt && typeof raw.createdAt === 'object') {
+          item.createdAt = formatFirestoreTimestamp(raw.createdAt);
+        }
+        if (raw.updatedAt && typeof raw.updatedAt === 'object') {
+          item.updatedAt = formatFirestoreTimestamp(raw.updatedAt);
+        }
+        return item as T;
       }
       return null;
     } catch (error) {
@@ -124,8 +171,9 @@ export const cmsService = {
     try {
       const colRef = collection(db, collectionName);
       const docRef = id ? doc(colRef, id) : doc(colRef);
+      const cleanedData = cleanFirestoreData(data);
       const finalData = {
-        ...data,
+        ...cleanedData,
         isDeleted: false,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -145,8 +193,9 @@ export const cmsService = {
     const path = `${collectionName}/${id}`;
     try {
       const docRef = doc(db, collectionName, id);
+      const cleanedData = cleanFirestoreData(data);
       const finalData = {
-        ...data,
+        ...cleanedData,
         updatedAt: serverTimestamp()
       };
       // Use setDoc with merge: true so both existing and non-existing initial items can be saved safely
@@ -195,7 +244,17 @@ export const cmsService = {
   subscribe<T>(collectionName: string, callback: (data: T[]) => void, constraints: QueryConstraint[] = []) {
     const q = query(collection(db, collectionName), ...constraints);
     return onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as T));
+      const data = snapshot.docs.map(d => {
+        const raw = d.data();
+        const item: any = { id: d.id, ...raw };
+        if (raw.createdAt && typeof raw.createdAt === 'object') {
+          item.createdAt = formatFirestoreTimestamp(raw.createdAt);
+        }
+        if (raw.updatedAt && typeof raw.updatedAt === 'object') {
+          item.updatedAt = formatFirestoreTimestamp(raw.updatedAt);
+        }
+        return item as T;
+      });
       callback(data);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, collectionName);

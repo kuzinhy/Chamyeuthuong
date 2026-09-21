@@ -97,19 +97,21 @@ export const SendLetterModal: React.FC<SendLetterModalProps> = ({
     if (!content.trim()) return;
 
     const finalImageUrl = getEffectiveImageUrl();
-    const finalDriveUrl = attachmentMode === 'drive-link' && driveUrl.trim() ? driveUrl.trim() : undefined;
+    const finalDriveUrl = attachmentMode === 'drive-link' && driveUrl.trim() ? driveUrl.trim() : '';
 
     onSubmit({
       senderName: isAnonymous || !senderName.trim() ? 'Bạn giấu tên' : senderName.trim(),
       isAnonymous,
       category,
-      title: title.trim() || undefined,
+      title: title.trim() || 'Thư gửi yêu thương',
       content: content.trim(),
-      targetPerson: targetPerson.trim() || undefined,
-      schoolOrProvince: schoolOrProvince.trim() || undefined,
+      targetPerson: targetPerson.trim() || 'Người bạn giấu tên',
+      schoolOrProvince: schoolOrProvince.trim() || '',
       colorTheme,
-      imageUrl: finalImageUrl,
+      imageUrl: finalImageUrl || '',
       driveUrl: finalDriveUrl,
+      status: 'pending',
+      likes: 0,
       isPublic: true
     });
 

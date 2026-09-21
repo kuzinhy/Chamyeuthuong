@@ -18,6 +18,7 @@ import {
 import { Letter, LetterCategory } from '../../types';
 import { storage } from '../../services/storage';
 import { useToast } from '../../context/ToastContext';
+import { formatFirestoreTimestamp } from '../../utils/dateUtils';
 
 export const AdminLettersTab: React.FC = () => {
   const [letters, setLetters] = useState<Letter[]>([]);
@@ -93,13 +94,18 @@ export const AdminLettersTab: React.FC = () => {
     }
   };
 
+  const pendingCount = (letters || []).filter(l => (l.status || 'pending') === 'pending').length;
+  const approvedCount = (letters || []).filter(l => l.status === 'approved').length;
+  const rejectedCount = (letters || []).filter(l => l.status === 'rejected').length;
+
   const filteredLetters = (letters || []).filter(l => {
     if (!l) return false;
     const matchesSearch = 
       (l.content || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (l.senderName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (l.targetPerson && l.targetPerson.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesStatus = statusFilter === 'all' || l.status === statusFilter;
+    const letterStatus = l.status || 'pending';
+    const matchesStatus = statusFilter === 'all' || letterStatus === statusFilter;
     const matchesCategory = categoryFilter === 'all' || l.category === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;
   });
@@ -134,10 +140,10 @@ export const AdminLettersTab: React.FC = () => {
     try {
       if (editingLetter) {
         await storage.updateLetterStatus(editingLetter.id, formData.status || 'approved', formData.replyFromLumi);
+        showToast('Đã cập nhật thông tin lá thư', 'success');
       } else {
-        // Need a create method in storage for letters if we want to add from admin
-        // For now, let's just show a toast that this isn't implemented or add it to storage
-        showToast('Tính năng thêm thư trực tiếp đang được cập nhật', 'info');
+        await storage.addLetter(formData as any);
+        showToast('Đã thêm thư mới vào hệ thống!', 'success');
       }
       setIsModalOpen(false);
       loadLetters();
@@ -189,12 +195,70 @@ export const AdminLettersTab: React.FC = () => {
           </p>
         </div>
 
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={loadLetters}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            title="Làm mới danh sách từ máy chủ"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-rose-500' : ''}`} />
+            <span>Làm mới</span>
+          </button>
+          <button
+            onClick={handleOpenAdd}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-sm font-bold shadow-md shadow-rose-500/20 transition-all cursor-pointer flex-shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Thêm thư yêu thương</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Status Badges */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <button
-          onClick={handleOpenAdd}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white rounded-xl text-sm font-bold shadow-md shadow-rose-500/20 transition-all cursor-pointer flex-shrink-0"
+          onClick={() => setStatusFilter('all')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            statusFilter === 'all'
+              ? 'bg-slate-800 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>Thêm thư yêu thương</span>
+          Tất cả ({letters.length})
+        </button>
+        <button
+          onClick={() => setStatusFilter('pending')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === 'pending'
+              ? 'bg-amber-500 text-white shadow-xs'
+              : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+          }`}
+        >
+          <Clock className="w-3.5 h-3.5" />
+          <span>Chờ duyệt ({pendingCount})</span>
+        </button>
+        <button
+          onClick={() => setStatusFilter('approved')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === 'approved'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+          }`}
+        >
+          <Check className="w-3.5 h-3.5" />
+          <span>Đã duyệt ({approvedCount})</span>
+        </button>
+        <button
+          onClick={() => setStatusFilter('rejected')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            statusFilter === 'rejected'
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+          }`}
+        >
+          <X className="w-3.5 h-3.5" />
+          <span>Từ chối ({rejectedCount})</span>
         </button>
       </div>
 
@@ -270,7 +334,9 @@ export const AdminLettersTab: React.FC = () => {
                       <p className="text-[11px] text-slate-400">
                         Đến: {letter.targetPerson || 'Người bạn giấu tên'}
                       </p>
-                      <span className="text-[10px] text-slate-400">{letter.createdAt}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {typeof letter.createdAt === 'string' ? letter.createdAt : formatFirestoreTimestamp(letter.createdAt)}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px] border border-rose-100">

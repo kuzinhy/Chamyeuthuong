@@ -11,7 +11,8 @@ import {
   Image as ImageIcon,
   Settings,
   Layout,
-  RefreshCw
+  RefreshCw,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { formatFirestoreTimestamp } from '../../utils/dateUtils';
@@ -23,6 +24,8 @@ interface DashboardStats {
   publishedPosts: number;
   draftPosts: number;
   pendingPosts: number;
+  totalLetters: number;
+  pendingLetters: number;
   totalUsers: number;
   recentLogs: any[];
 }
@@ -46,15 +49,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
     try {
       // For now, we'll get real counts from storage where possible, 
       // or mock them if storage doesn't have a direct count method yet
-      const [stories, submissions, users, logs] = await Promise.all([
+      const [stories, submissions, letters, users, logs] = await Promise.all([
         storage.getStories(),
         storage.getSubmissions(),
+        storage.getLetters(),
         storage.getUsers(),
         storage.getAuditLogs()
       ]);
 
       const safeStories = stories || [];
       const safeSubmissions = submissions || [];
+      const safeLetters = letters || [];
       const safeUsers = users || [];
 
       setStats({
@@ -62,6 +67,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         publishedPosts: safeStories.filter(s => s && s.status === 'published').length,
         draftPosts: safeStories.filter(s => s && s.status === 'draft').length,
         pendingPosts: safeSubmissions.filter(s => s && s.status === 'pending').length,
+        totalLetters: safeLetters.length,
+        pendingLetters: safeLetters.filter(l => (l.status || 'pending') === 'pending').length,
         totalUsers: safeUsers.length || 1, // Fallback
         recentLogs: logs || []
       });
@@ -73,6 +80,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
         publishedPosts: 0,
         draftPosts: 0,
         pendingPosts: 0,
+        totalLetters: 0,
+        pendingLetters: 0,
         totalUsers: 1,
         recentLogs: []
       });
@@ -91,13 +100,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
 
   const cards = [
     { title: 'Tổng bài viết', value: stats.totalPosts, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100', tab: 'stories' },
+    { title: 'Hộp thư yêu thương', value: stats.totalLetters, subtitle: `${stats.pendingLetters} chờ duyệt`, icon: Mail, color: 'text-pink-600', bg: 'bg-pink-100', tab: 'letters' },
     { title: 'Đã xuất bản', value: stats.publishedPosts, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-100', tab: 'stories' },
     { title: 'Bản nháp', value: stats.draftPosts, icon: FileEdit, color: 'text-amber-600', bg: 'bg-amber-100', tab: 'stories' },
-    { title: 'Chờ duyệt', value: stats.pendingPosts, icon: Clock, color: 'text-rose-600', bg: 'bg-rose-100', tab: 'submissions' },
+    { title: 'Bài đóng góp chờ', value: stats.pendingPosts, icon: Clock, color: 'text-rose-600', bg: 'bg-rose-100', tab: 'submissions' },
     { title: 'Quản trị viên', value: stats.totalUsers, icon: Users, color: 'text-purple-600', bg: 'bg-purple-100', tab: 'users' },
   ];
 
   const quickActions = [
+    { title: 'Quản lý Hộp thư', icon: Mail, tab: 'letters', color: 'bg-pink-500' },
     { title: 'Viết bài mới', icon: PlusCircle, tab: 'stories', color: 'bg-sky-500' },
     { title: 'Upload Media', icon: ImageIcon, tab: 'gallery', color: 'bg-indigo-500' },
     { title: 'Sửa trang chủ', icon: Layout, tab: 'homepage', color: 'bg-emerald-500' },

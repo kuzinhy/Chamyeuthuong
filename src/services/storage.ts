@@ -15,6 +15,9 @@ import {
   UserRole
 } from '../types';
 import { cmsService } from './cmsService';
+import { apiService } from './api';
+import { auth } from '../lib/firebase';
+import { formatFirestoreTimestamp } from '../utils/dateUtils';
 import { where, orderBy, limit } from 'firebase/firestore';
 import {
   INITIAL_STORIES,
@@ -215,47 +218,134 @@ export const storage = {
     return dedupeRequest('letters', async () => {
       const CACHE_KEY = 'lumi_cms_letters_v3';
       try {
+        // 1. Fetch from Firestore
         const letters = await cmsService.getAll<Letter>('letters');
-        const combined = combineWithInitial(letters || [], INITIAL_LETTERS);
+
+        // 2. Normalize Firestore letters
+        const normalizedFirestore = (letters || []).map(l => ({
+          ...l,
+          id: l.id,
+          senderName: l.senderName || 'Bạn giấu tên',
+          category: l.category || 'Tâm sự',
+          content: l.content || '',
+          status: (l.status as any) || 'pending',
+          likes: typeof l.likes === 'number' ? l.likes : 0,
+          createdAt: typeof l.createdAt === 'string' ? l.createdAt : (formatFirestoreTimestamp(l.createdAt) || 'Vừa xong')
+        }));
+
+        // 3. Fallback sync with Express backend DB
+        let backendLetters: Letter[] = [];
+        try {
+          const email = auth.currentUser?.email || undefined;
+          backendLetters = await apiService.getLetters(email);
+        } catch { }
+
+        // 4. Combine Firestore, backend, and initial static letters
+        const remoteCombined = combineWithInitial(normalizedFirestore, backendLetters);
+        const combined = combineWithInitial(remoteCombined, INITIAL_LETTERS);
+
+        // 5. Preserve any locally submitted letters that may not have synced yet
+        const cached = getLocalCache<Letter>(CACHE_KEY) || [];
+        const combinedMap = new Map(combined.map(item => [item.id, item]));
+        for (const localItem of cached) {
+          if (localItem && localItem.id && !combinedMap.has(localItem.id) && !localItem.isDeleted) {
+            combined.unshift(localItem);
+            combinedMap.set(localItem.id, localItem);
+          }
+        }
+
         setLocalCache(CACHE_KEY, combined);
         return combined;
-      } catch {
+      } catch (err) {
+        console.warn('getLetters remote error, falling back to local cache:', err);
         const cached = getLocalCache<Letter>(CACHE_KEY);
         return cached && cached.length > 0 ? cached : INITIAL_LETTERS;
       }
     });
   },
 
-  async addLetter(letter: Letter): Promise<void> {
+  async addLetter(letter: Partial<Letter>): Promise<Letter> {
     const CACHE_KEY = 'lumi_cms_letters_v3';
     const id = letter.id || `letter-${Date.now()}`;
-    const newLetter = { ...letter, id };
-    const current = await this.getLetters();
-    setLocalCache(CACHE_KEY, [newLetter, ...current.filter(l => l.id !== id)]);
+    const now = new Date();
+    const createdAtStr = now.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
 
+    const newLetter: Letter = {
+      id,
+      senderName: letter.senderName?.trim() || 'Bạn giấu tên',
+      isAnonymous: letter.isAnonymous ?? true,
+      category: letter.category || 'Tâm sự',
+      title: letter.title?.trim() || 'Thư gửi yêu thương',
+      content: letter.content?.trim() || '',
+      targetPerson: letter.targetPerson?.trim() || 'Người bạn giấu tên',
+      schoolOrProvince: letter.schoolOrProvince?.trim() || '',
+      imageUrl: letter.imageUrl?.trim() || '',
+      driveUrl: letter.driveUrl?.trim() || '',
+      createdAt: letter.createdAt || createdAtStr,
+      likes: typeof letter.likes === 'number' ? letter.likes : 0,
+      status: letter.status || 'pending', // Default to pending for moderation in Admin > Letters tab
+      replyFromLumi: letter.replyFromLumi?.trim() || '',
+      colorTheme: letter.colorTheme || 'rose',
+      isPublic: letter.isPublic !== undefined ? letter.isPublic : true,
+      userId: letter.userId || auth.currentUser?.uid || ''
+    };
+
+    // 1. Immediately store in local cache for instant UI feedback
+    const current = await this.getLetters();
+    const updated = [newLetter, ...current.filter(l => l.id !== id)];
+    setLocalCache(CACHE_KEY, updated);
+
+    // 2. Persist to Firestore
     try {
-      const { id: _, ...data } = newLetter;
-      await cmsService.create('letters', data as any, id);
+      const { id: docId, ...data } = newLetter;
+      await cmsService.create('letters', data, id);
     } catch (e) {
-      console.warn('addLetter firestore warning:', e);
+      console.warn('addLetter firestore error:', e);
     }
+
+    // 3. Sync to Express server backend /api/letters
+    try {
+      await apiService.submitLetter(newLetter);
+    } catch (e) {
+      console.warn('addLetter backend API error:', e);
+    }
+
+    return newLetter;
   },
 
   async updateLetterStatus(id: string, status: 'approved' | 'rejected' | 'pending', reply?: string): Promise<void> {
     const CACHE_KEY = 'lumi_cms_letters_v3';
     const current = await this.getLetters();
     const existing = current.find(l => l.id === id) || INITIAL_LETTERS.find(l => l.id === id) || {};
-    const updatedLetter = { ...existing, status, replyFromLumi: reply, id } as Letter;
+    const updatedLetter = { 
+      ...existing, 
+      status, 
+      replyFromLumi: reply !== undefined ? reply : (existing as any).replyFromLumi || '', 
+      id 
+    } as Letter;
 
     const updated = current.map(l => l.id === id ? updatedLetter : l);
     if (!current.some(l => l.id === id)) updated.unshift(updatedLetter);
     setLocalCache(CACHE_KEY, updated);
 
+    // 1. Persist to Firestore
     try {
       const { id: _, ...data } = updatedLetter;
       await cmsService.update('letters', id, data as any);
     } catch (e) {
       console.warn('updateLetterStatus firestore warning:', e);
+    }
+
+    // 2. Persist to backend /api/letters/:id
+    try {
+      const email = auth.currentUser?.email || 'nguyenhuy.thudaumot@gmail.com';
+      await apiService.moderateLetter(id, { status, replyFromLumi: reply }, email);
+    } catch (e) {
+      console.warn('updateLetterStatus backend API warning:', e);
     }
   },
 
@@ -268,6 +358,11 @@ export const storage = {
     } catch (e) {
       console.warn('deleteLetter firestore warning:', e);
     }
+
+    try {
+      const email = auth.currentUser?.email || 'nguyenhuy.thudaumot@gmail.com';
+      await apiService.deleteLetter(id, email);
+    } catch (e) { }
   },
 
   // --- Photovoice ---

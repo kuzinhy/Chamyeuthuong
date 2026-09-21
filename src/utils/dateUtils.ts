@@ -6,14 +6,22 @@ export function formatFirestoreTimestamp(timestamp: any): string {
   let date: Date;
   if (timestamp instanceof Timestamp) {
     date = timestamp.toDate();
-  } else if (timestamp?.toDate) {
+  } else if (timestamp?.toDate && typeof timestamp.toDate === 'function') {
     date = timestamp.toDate();
   } else if (timestamp instanceof Date) {
     date = timestamp;
+  } else if (typeof timestamp === 'object' && typeof timestamp.seconds === 'number') {
+    date = new Date(timestamp.seconds * 1000);
   } else if (typeof timestamp === 'string') {
+    date = new Date(timestamp);
+  } else if (typeof timestamp === 'number') {
     date = new Date(timestamp);
   } else {
     return '—';
+  }
+
+  if (isNaN(date.getTime())) {
+    return typeof timestamp === 'string' ? timestamp : '—';
   }
 
   return date.toLocaleString('vi-VN', {

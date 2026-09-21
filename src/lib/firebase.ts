@@ -8,15 +8,25 @@ import {
   browserLocalPersistence, 
   User as FirebaseUser 
 } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase App safely (singleton instance)
 export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Cloud Firestore with databaseId from config
-export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+// Initialize Cloud Firestore with databaseId and ignoreUndefinedProperties to prevent setDoc undefined errors
+function getOrInitFirestore() {
+  try {
+    return initializeFirestore(firebaseApp, {
+      ignoreUndefinedProperties: true
+    }, firebaseConfig.firestoreDatabaseId || undefined);
+  } catch {
+    return getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || undefined);
+  }
+}
+
+export const db = getOrInitFirestore();
 
 // Initialize Firebase Authentication with local persistence for cross-tab & multi-session support
 export const auth = getAuth(firebaseApp);
