@@ -27,6 +27,15 @@ export const userService = {
         const docSnap = snapshot.docs[0];
         return { id: docSnap.id, ...docSnap.data() } as UserProfile;
       }
+      
+      // Case-insensitive scan fallback in case existing document had mixed-case email
+      const allDocs = await getDocs(collection(db, 'users'));
+      for (const d of allDocs.docs) {
+        const u = d.data() as UserProfile;
+        if (u.email && u.email.trim().toLowerCase() === normalized) {
+          return { id: d.id, ...u };
+        }
+      }
       return null;
     } catch (error) {
       console.error('Error fetching profile by email:', error);
@@ -37,19 +46,21 @@ export const userService = {
   async createProfile(uid: string, data: Partial<UserProfile>): Promise<UserProfile> {
     try {
       const docRef = doc(db, 'users', uid);
+      const cleanEmail = (data.email || '').trim().toLowerCase();
       const profile: UserProfile = {
         id: uid,
-        email: data.email || '',
-        displayName: data.displayName || '',
+        displayName: data.displayName || (cleanEmail ? cleanEmail.split('@')[0] : 'Người dùng LUMI'),
         avatarUrl: data.avatarUrl || '',
         role: data.role || 'viewer', // Default role
         status: 'active',
         createdAt: new Date().toISOString(),
-        ...data
+        ...data,
+        email: cleanEmail
       };
       
       await setDoc(docRef, {
         ...profile,
+        email: cleanEmail,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         lastLoginAt: serverTimestamp()

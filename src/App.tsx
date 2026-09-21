@@ -9,6 +9,7 @@ import { Sparkles } from 'lucide-react';
 // Providers
 import { ToastProvider, useToast } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { LoadingProvider, useLoading } from './context/LoadingContext';
 
 // Primary View (eager loaded for instant first paint)
 import { HomeView } from './components/Home/HomeView';
@@ -66,6 +67,7 @@ const PageFallback = () => (
 
 function AppContent() {
   const { user } = useAuth();
+  const { withLoading } = useLoading();
   const [activePage, setActivePage] = useState<ActiveNavPage>('home');
   
   // Stale-while-revalidate initial states: load instantly from cache/seed
@@ -153,24 +155,28 @@ function AppContent() {
 
   const loadAllData = useCallback(async () => {
     try {
-      const results = await Promise.allSettled([
-        storage.getStories(),
-        storage.getSubmissions(),
-        storage.getLetters(),
-        storage.getGallery(),
-        storage.getPhotovoice(),
-        storage.getSurveys()
-      ]);
-      if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) setStories(results[0].value);
-      if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) setSubmissions(results[1].value);
-      if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) setLetters(results[2].value);
-      if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) setGalleryItems(results[3].value);
-      if (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) setPhotovoiceItems(results[4].value);
-      if (results[5].status === 'fulfilled' && Array.isArray(results[5].value)) setSurveys(results[5].value);
+      await withLoading(
+        Promise.allSettled([
+          storage.getStories(),
+          storage.getSubmissions(),
+          storage.getLetters(),
+          storage.getGallery(),
+          storage.getPhotovoice(),
+          storage.getSurveys()
+        ]).then((results) => {
+          if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) setStories(results[0].value);
+          if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) setSubmissions(results[1].value);
+          if (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) setLetters(results[2].value);
+          if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) setGalleryItems(results[3].value);
+          if (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) setPhotovoiceItems(results[4].value);
+          if (results[5].status === 'fulfilled' && Array.isArray(results[5].value)) setSurveys(results[5].value);
+        }),
+        'Đang đồng bộ dữ liệu...'
+      );
     } catch (error) {
       console.error('Error loading data:', error);
     }
-  }, []);
+  }, [withLoading]);
 
   useEffect(() => {
     loadCachedData();
@@ -241,33 +247,33 @@ function AppContent() {
 
   const handleSubmitSubmission = useCallback(async (sub: any) => {
     try {
-      await storage.addSubmission(sub);
+      await withLoading(storage.addSubmission(sub), 'Đang gửi bài đóng góp...');
       showToast('Đã gửi bài đóng góp thành công!', { type: 'success' });
       loadAllData();
     } catch (error) {
       showToast('Lỗi khi gửi bài', 'error');
     }
-  }, [loadAllData, showToast]);
+  }, [loadAllData, showToast, withLoading]);
 
   const handleAddPhotovoice = useCallback(async (item: any) => {
     try {
-      await storage.addPhotovoice(item);
+      await withLoading(storage.addPhotovoice(item), 'Đang đăng tải hình ảnh...');
       showToast('Đã đăng ảnh thành công!', 'success');
       loadAllData();
     } catch (error) {
       showToast('Lỗi khi đăng ảnh', 'error');
     }
-  }, [loadAllData, showToast]);
+  }, [loadAllData, showToast, withLoading]);
 
   const handleSubmitSurvey = useCallback(async (survey: any) => {
     try {
-      await storage.addSurvey(survey);
+      await withLoading(storage.addSurvey(survey), 'Đang lưu ý kiến khảo sát...');
       showToast('Cảm ơn bạn đã tham gia khảo sát!', 'success');
       loadAllData();
     } catch (error) {
       showToast('Lỗi khi gửi khảo sát', 'error');
     }
-  }, [loadAllData, showToast]);
+  }, [loadAllData, showToast, withLoading]);
 
   // Stable derived collections
   const approvedLetters = useMemo(() => {
@@ -414,7 +420,7 @@ function AppContent() {
             onClose={handleCloseLetterModal}
             onSubmit={async (data) => {
               try {
-                await storage.addLetter(data as any);
+                await withLoading(storage.addLetter(data as any), 'Đang gửi thư yêu thương...');
                 showToast('Đã gửi thư yêu thương của bạn! Cảm ơn bạn đã sẻ chia ❤️', { type: 'heart' });
                 loadAllData();
               } catch (error) {
@@ -473,7 +479,9 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <AppContent />
+        <LoadingProvider>
+          <AppContent />
+        </LoadingProvider>
       </AuthProvider>
     </ToastProvider>
   );

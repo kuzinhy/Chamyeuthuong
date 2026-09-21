@@ -236,6 +236,28 @@ export const INITIAL_USERS: UserProfile[] = [
     lastLoginAt: '2024-10-30T10:00:00Z'
   },
   {
+    id: 'user-admin-2',
+    email: 'hoanghuutrung1@gmail.com',
+    displayName: 'Hoàng Hữu Trung (Quản Trị Viên Cấp Cao)',
+    avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=hoanghuutrung',
+    role: 'super_admin',
+    status: 'active',
+    is_protected_admin: true,
+    createdAt: '2024-09-01T08:00:00Z',
+    lastLoginAt: '2024-10-30T10:00:00Z'
+  },
+  {
+    id: 'user-admin-3',
+    email: 'vanchien.vov@gmail.com',
+    displayName: 'Văn Chiến VOV (Quản Trị Viên Cấp Cao)',
+    avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=vanchien',
+    role: 'super_admin',
+    status: 'active',
+    is_protected_admin: true,
+    createdAt: '2024-09-01T08:00:00Z',
+    lastLoginAt: '2024-10-30T10:00:00Z'
+  },
+  {
     id: 'user-editor-1',
     email: 'bientap.lumi@gmail.com',
     displayName: 'Ban Biên Tập LUMI',

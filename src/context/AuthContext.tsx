@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole, UserNotification } from '../types';
-import { onAuthStateChanged, User as FirebaseUser, signInAnonymously } from 'firebase/auth';
+import { 
+  onAuthStateChanged, 
+  User as FirebaseUser, 
+  signInAnonymously,
+  setPersistence,
+  browserLocalPersistence
+} from 'firebase/auth';
 import { auth, signInWithFirebaseGoogle, signOutFirebase } from '../lib/firebase';
 import { userService } from '../services/userService';
 import { isSuperAdminEmail, normalizeEmail } from '../utils/adminAuth';
@@ -82,21 +88,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const syncUserProfile = async (firebaseUser: { uid: string; email?: string | null; displayName?: string | null; photoURL?: string | null; isAnonymous?: boolean }): Promise<UserProfile> => {
-    const email = normalizeEmail(firebaseUser.email);
+    let email = normalizeEmail(firebaseUser.email);
+    // If email is not in Firebase Auth token (e.g. anonymous sign-in or fallback), check local session
+    if (!email && typeof window !== 'undefined') {
+      const stored = localStorage.getItem('lumi_auth_email');
+      if (stored) {
+        email = normalizeEmail(stored);
+      }
+    }
+
     const isSuperAdminUser = isSuperAdminEmail(email);
 
     // 1. Fetch profile by Firebase UID
     let profile = await userService.getProfile(firebaseUser.uid);
 
-    // 2. If not found by UID, check if this email was invited by admin/super_admin
+    // 2. If not found by UID, check if this email already exists in Firestore
     if (!profile && email) {
-      const invitedProfile = await userService.getProfileByEmail(email);
-      if (invitedProfile) {
+      const existingProfile = await userService.getProfileByEmail(email);
+      if (existingProfile) {
         profile = await userService.createProfile(firebaseUser.uid, {
           email,
-          displayName: firebaseUser.displayName || invitedProfile.displayName || 'Người dùng LUMI',
-          avatarUrl: firebaseUser.photoURL || invitedProfile.avatarUrl || '',
-          role: isSuperAdminUser ? 'super_admin' : (invitedProfile.role || 'viewer'),
+          displayName: firebaseUser.displayName || existingProfile.displayName || email.split('@')[0],
+          avatarUrl: firebaseUser.photoURL || existingProfile.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${email}`,
+          role: isSuperAdminUser ? 'super_admin' : (existingProfile.role || 'viewer'),
           status: 'active'
         });
       }
@@ -104,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 3. If still no profile, create new profile
     if (!profile) {
-      if (firebaseUser.isAnonymous) {
+      if (firebaseUser.isAnonymous && !email) {
         return {
           id: firebaseUser.uid,
           email: '',
@@ -132,27 +146,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await userService.updateLastLogin(firebaseUser.uid);
     }
 
+    if (isSuperAdminUser) {
+      profile.role = 'super_admin';
+    }
+
+    if (typeof window !== 'undefined') {
+      if (email) {
+        localStorage.setItem('lumi_auth_email', email);
+      }
+      localStorage.setItem('lumi_auth_profile', JSON.stringify(profile));
+    }
+
     return profile;
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
-      if (firebaseUser) {
-        try {
-          const profile = await syncUserProfile(firebaseUser);
-          setUser(profile);
-        } catch (error) {
-          console.error('Error syncing user profile:', error);
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    let isMounted = true;
+    let unsubscribe: () => void = () => {};
 
-    return () => unsubscribe();
+    const initAuth = async () => {
+      try {
+        // Enforce browserLocalPersistence to guarantee user login state persists across sessions, tabs, and reloads
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (err) {
+        console.warn('Failed to set browserLocalPersistence in AuthProvider:', err);
+      }
+
+      if (!isMounted) return;
+
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!isMounted) return;
+        setLoading(true);
+        if (firebaseUser) {
+          try {
+            const profile = await syncUserProfile(firebaseUser);
+            if (isMounted) setUser(profile);
+          } catch (error) {
+            console.error('Error syncing user profile:', error);
+            if (isMounted) setUser(null);
+          }
+        } else {
+          // Fallback to locally preserved session if available (e.g. cross-tab or fast reload)
+          if (typeof window !== 'undefined') {
+            const storedEmail = localStorage.getItem('lumi_auth_email');
+            const storedProfile = localStorage.getItem('lumi_auth_profile');
+            if (storedProfile && storedEmail) {
+              try {
+                const cached = JSON.parse(storedProfile) as UserProfile;
+                if (cached && cached.email) {
+                  const clean = normalizeEmail(cached.email);
+                  if (isSuperAdminEmail(clean)) {
+                    cached.role = 'super_admin';
+                  }
+                  if (isMounted) setUser(cached);
+                } else {
+                  if (isMounted) setUser(null);
+                }
+              } catch {
+                if (isMounted) setUser(null);
+              }
+            } else {
+              if (isMounted) setUser(null);
+            }
+          } else {
+            if (isMounted) setUser(null);
+          }
+        }
+        if (isMounted) setLoading(false);
+      });
+    };
+
+    initAuth();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -198,6 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithFirebasePopup = async (): Promise<UserProfile> => {
     try {
+      await setPersistence(auth, browserLocalPersistence);
       const { firebaseUser } = await signInWithFirebaseGoogle();
       setIsAuthModalOpen(false);
       const profile = await syncUserProfile(firebaseUser);
@@ -213,11 +283,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (email && email.trim()) {
       const cleanEmail = normalizeEmail(email);
       const isSuperAdminUser = isSuperAdminEmail(cleanEmail);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('lumi_auth_email', cleanEmail);
+      }
       
       let firebaseUid = '';
       try {
-        const credential = await signInAnonymously(auth);
-        firebaseUid = credential.user.uid;
+        await setPersistence(auth, browserLocalPersistence);
+        if (!auth.currentUser) {
+          const credential = await signInAnonymously(auth);
+          firebaseUid = credential.user.uid;
+        } else {
+          firebaseUid = auth.currentUser.uid;
+        }
       } catch (authError) {
         console.warn('Firebase signInAnonymously failed (using fallback mock UID):', authError);
         firebaseUid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -252,6 +330,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await userService.updateLastLogin(firebaseUid);
       }
 
+      if (isSuperAdminUser && profile) {
+        profile.role = 'super_admin';
+      }
+
+      if (typeof window !== 'undefined' && profile) {
+        localStorage.setItem('lumi_auth_profile', JSON.stringify(profile));
+      }
+
       setUser(profile);
       setIsAuthModalOpen(false);
       return profile!;
@@ -261,11 +347,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('lumi_auth_email');
+        localStorage.removeItem('lumi_auth_profile');
+      }
       await signOutFirebase();
       setUser(null);
       setIsProfileDrawerOpen(false);
     } catch (error) {
       console.error('Logout error:', error);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('lumi_auth_email');
+        localStorage.removeItem('lumi_auth_profile');
+      }
+      setUser(null);
     }
   };
 

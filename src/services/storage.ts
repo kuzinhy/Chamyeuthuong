@@ -28,6 +28,7 @@ import {
   INITIAL_SUBMISSIONS,
   INITIAL_USERS
 } from '../data/initialData';
+import { loadingTracker } from '../context/LoadingContext';
 
 // --- Local Storage Cache Helpers ---
 function getLocalCache<T>(key: string): T[] | null {
@@ -56,7 +57,7 @@ function setLocalCache<T>(key: string, data: T[]): void {
  * - Any initial items that haven't been touched or deleted remain visible.
  * - Any newly created Firestore items are included.
  */
-function combineWithInitial<T extends { id: string; isDeleted?: boolean }>(
+function combineWithInitial<T extends { id: string; isDeleted?: boolean; email?: string }>(
   firestoreItems: T[],
   initialItems: T[]
 ): T[] {
@@ -66,9 +67,19 @@ function combineWithInitial<T extends { id: string; isDeleted?: boolean }>(
   const deletedIds = new Set(safeFirestore.filter(item => item && item.isDeleted).map(item => item.id));
   const firestoreMap = new Map(validFirestore.map(item => [item.id, item]));
 
+  // Deduplicate by email if items have email property (e.g. UserProfile)
+  const firestoreEmails = new Set(
+    validFirestore
+      .map(item => (typeof item.email === 'string' ? item.email.trim().toLowerCase() : null))
+      .filter(Boolean)
+  );
+
   const result: T[] = [...validFirestore];
   for (const initItem of safeInitial) {
-    if (initItem && !firestoreMap.has(initItem.id) && !deletedIds.has(initItem.id)) {
+    const initEmail = typeof initItem?.email === 'string' ? initItem.email.trim().toLowerCase() : null;
+    const hasEmailCollision = initEmail && firestoreEmails.has(initEmail);
+
+    if (initItem && !firestoreMap.has(initItem.id) && !deletedIds.has(initItem.id) && !hasEmailCollision) {
       result.push(initItem);
     }
   }
@@ -78,11 +89,12 @@ function combineWithInitial<T extends { id: string; isDeleted?: boolean }>(
 // In-flight request deduplication map to prevent duplicate concurrent network requests
 const inFlightRequests = new Map<string, Promise<any>>();
 
-function dedupeRequest<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+function dedupeRequest<T>(key: string, fetcher: () => Promise<T>, message?: string): Promise<T> {
   if (inFlightRequests.has(key)) {
     return inFlightRequests.get(key) as Promise<T>;
   }
-  const promise = fetcher().finally(() => {
+  const trackedFetcher = () => loadingTracker.track(fetcher(), message || 'Đang đồng bộ dữ liệu...');
+  const promise = trackedFetcher().finally(() => {
     inFlightRequests.delete(key);
   });
   inFlightRequests.set(key, promise);

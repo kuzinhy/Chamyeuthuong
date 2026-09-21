@@ -1,5 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut, 
+  setPersistence, 
+  browserLocalPersistence, 
+  User as FirebaseUser 
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -10,8 +18,14 @@ export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(fireb
 // Initialize Cloud Firestore with databaseId from config
 export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
 
-// Initialize Firebase Authentication
+// Initialize Firebase Authentication with local persistence for cross-tab & multi-session support
 export const auth = getAuth(firebaseApp);
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('Firebase setPersistence warning:', err);
+  });
+}
+
 export const googleAuthProvider = new GoogleAuthProvider();
 googleAuthProvider.setCustomParameters({
   prompt: 'select_account'
